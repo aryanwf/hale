@@ -17,7 +17,7 @@
     "typescript": "^5.9.3"
   },
   "scripts": {
-    "dev": "bun run --parallel dev:web dev:mobile backend",
+    "dev": "bun run --parallel dev:web dev:mobile:usb backend",
     "dev:web": "bun run --cwd apps/web dev",
     "dev:mobile": "bun run --cwd apps/mobile dev",
     "dev:mobile:usb": "bun run --cwd apps/mobile dev:usb",

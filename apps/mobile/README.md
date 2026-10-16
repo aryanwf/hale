@@ -55,7 +55,9 @@ Once `adb devices` shows the phone as `device`, use the same commands **inside W
 
 ```sh
 bun run mobile:android
-# Later Metro sessions, after stopping the previous one:
+# Start web, Convex, and the USB-connected Android dev client:
+bun run dev
+# Or start only the Android dev client:
 bun run dev:mobile:usb
 ```
 
@@ -65,19 +67,19 @@ bun run dev:mobile:usb
 
 If USB sharing fails, leave the phone connected to Windows and use Windows Platform-Tools for the USB transport instead. Do not attach the phone with `usbipd` in this mode. Linux Gradle and the Linux SDK still compile the APK; Linux ADB communicates with the Windows ADB server over localhost.
 
-Set `HALE_WINDOWS_ADB` to the WSL path of Windows `adb.exe`. This machine’s `~/.config/hale/android-env.sh` configures the bridge at port 5038, separate from the usual port 5037. `bun run dev:mobile:usb` starts that Windows server automatically, forwards port 8081, and opens Hale. Approve the phone’s USB-debugging authorization prompt for the Windows server. WSL mirrored networking or working Windows localhost forwarding is required.
+Set `HALE_WINDOWS_ADB` to the WSL path of Windows `adb.exe`. This machine’s `~/.config/hale/android-env.sh` configures the bridge at port 5038, separate from the usual port 5037. `bun run dev:mobile:usb` starts that Windows server automatically, forwards an available Metro port, and opens Hale. Approve the phone’s USB-debugging authorization prompt for the Windows server. WSL mirrored networking or working Windows localhost forwarding is required.
 
 After reboot, source the environment file and run `bun run dev:mobile:usb` again. Stop any existing Metro session first. For a native Linux USB setup instead, unset `HALE_WINDOWS_ADB` and `ADB_SERVER_SOCKET` and attach the phone to WSL.
 
 ## Fast Refresh (everyday development)
 
-After the first installation, stop any previous Metro process and run from the repository root:
+After the first installation, run from the repository root:
 
 ```powershell
-bun run dev:mobile:usb
+bun run dev
 ```
 
-The USB command forwards device port 8081 to your computer using `adb reverse`, starts Metro on localhost, and opens the installed development app. It works without shared Wi-Fi. Re-run it after reconnecting USB. Connect only one device, or set `$env:ANDROID_SERIAL` to the desired ID from `adb devices`. If needed, open the development launcher and enter `http://127.0.0.1:8081`.
+The root command starts web, Convex, and the Android dev server. The USB command forwards an available Metro port to your computer using `adb reverse`, starts Metro on localhost, and opens the installed development app. It works without shared Wi-Fi. Re-run it after reconnecting USB. Connect only one device, or set `$env:ANDROID_SERIAL` to the desired ID from `adb devices`. If needed, open the development launcher and enter `http://127.0.0.1:<port>` using the port printed by Expo.
 
 For Wi-Fi instead:
 

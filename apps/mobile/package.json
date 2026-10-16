@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "expo start --dev-client --lan",
+    "dev": "expo start --dev-client --lan --port 0",
     "dev:usb": "node scripts/start-android-usb.mjs",
     "android": "expo run:android",
     "build:apk": "node scripts/build-android-apk.mjs",

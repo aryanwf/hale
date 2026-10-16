@@ -125,7 +125,7 @@ function configuredClient() {
 }
 const client = configuredClient();
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  if (Platform.OS === "web") return <Gate title="Hale’s native companion." description="Use apps/web for your browser dashboard. Background microphone capture requires an iOS or Android development build." />;
+  if (Platform.OS !== "android") return <Gate title="Hale’s Android companion." description="Install the Android development build for background microphone capture. Use apps/web for your browser dashboard." />;
   if (config.mode === "demo") return <DemoWorkspace>{children}</DemoWorkspace>;
   if (config.mode === "invalid") return <Gate title="Choose an app mode." description="EXPO_PUBLIC_APP_MODE must be demo or live." />;
   if (!client || !config.clerkKey || !config.siteUrl) return <Gate title="Connect your private space." description="Set the EXPO_PUBLIC Clerk and Convex values in apps/mobile/.env.local. Live mode never silently falls back to demo data." />;

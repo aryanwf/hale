@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "expo start --dev-client",
+    "dev": "expo start --dev-client --lan",
+    "dev:usb": "node scripts/start-android-usb.mjs",
     "android": "expo run:android",
-    "ios": "expo run:ios",
+    "build:apk": "node scripts/build-android-apk.mjs",
     "typecheck": "tsc --noEmit",
     "check:native": "node scripts/check-native-config.mjs",
-    "bundle": "expo export --platform android --platform ios",
+    "bundle": "expo export --platform android",
     "test": "bun test src/lib"
   },
   "dependencies": {
@@ -30,6 +31,7 @@
     "expo-status-bar": "~57.0.1",
     "expo-web-browser": "~57.0.3",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0"
   },

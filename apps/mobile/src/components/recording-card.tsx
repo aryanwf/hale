@@ -35,7 +35,7 @@ export function RecordingCard() {
       <View style={styles.divider} /><Text style={styles.eyebrow}>{pending.length} SAVED ON THIS DEVICE</Text>
       {pending.map((item, index) => <View key={item.id} style={styles.stack}><Text style={styles.small}>Segment {index + 1} · {durationLabel(item.durationMs / 1000)}</Text>{!hasActiveRecording && <LocalPlayback uri={item.uri} />}<Button title={`Discard local segment ${index + 1}`} tone="secondary" disabled={hasActiveRecording || busy} onPress={() => Alert.alert("Discard this local audio?", "This cannot be undone. Previously uploaded evidence is not deleted here.", [{ text: "Keep it", style: "cancel" }, { text: "Discard", style: "destructive", onPress: () => controller.discard(item.id) }])} /></View>)}
       {mode === "live" && <Button title={uploading ? "Uploading…" : "Upload saved audio / retry"} disabled={recording || busy} onPress={() => void controller.retry()} />}
-      <Text style={styles.small}>A maximum of 3 files are kept in the app’s private storage until uploaded or discarded. Device backups may include local files on iOS. Uninstalling or clearing app data removes unsent audio.</Text>
+      <Text style={styles.small}>A maximum of 3 files are kept in the app’s private storage until uploaded or discarded. Android app backup is disabled. Uninstalling or clearing app data removes unsent audio.</Text>
     </View>}
   </View>;
 }

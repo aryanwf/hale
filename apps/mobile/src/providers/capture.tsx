@@ -6,6 +6,7 @@ import { MAX_AUDIO_BYTES, MAX_NATIVE_RECORDING_SECONDS } from "@hale/contracts/a
 import { CaptureController } from "../lib/capture";
 import { createCaptureStore } from "../lib/native-store";
 import { measureMediaDuration } from "../lib/media-duration";
+import { requestAndroidRecordingPermissions } from "../lib/recording-permissions";
 import { useWorkspace } from "./workspace";
 
 const Context = createContext<CaptureController | null>(null);
@@ -39,11 +40,14 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     },
     device: {
       prepare: async () => {
-        if (Constants.appOwnership === "expo" || Platform.OS === "web") throw new Error("Background recording requires a native development build, not Expo Go.");
+        if (Constants.appOwnership === "expo" || Platform.OS !== "android") throw new Error("Background recording requires the Hale Android development build, not Expo Go.");
         if (AppState.currentState !== "active") throw new Error("Open Hale before starting the microphone.");
-        const permission = await AudioModule.requestRecordingPermissionsAsync();
-        if (!permission.granted) throw new Error("Microphone access is off. Enable it in your device’s app settings, then try again.");
-        await setAudioModeAsync({ allowsRecording: true, allowsBackgroundRecording: true, playsInSilentMode: true, interruptionMode: "doNotMix" });
+        await requestAndroidRecordingPermissions({
+          apiLevel: Number(Platform.Version),
+          requestMicrophone: () => AudioModule.requestRecordingPermissionsAsync(),
+          requestNotifications: () => AudioModule.requestNotificationPermissionsAsync(),
+        });
+        await setAudioModeAsync({ allowsRecording: true, allowsBackgroundRecording: true, interruptionMode: "doNotMix" });
         await recorder.prepareToRecordAsync();
         if (!recorder.uri) throw new Error("The microphone did not provide a local recording file.");
         return recorder.uri;

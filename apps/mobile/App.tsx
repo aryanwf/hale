@@ -1,5 +1,5 @@
 import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
-import { BackHandler, KeyboardAvoidingView, Platform, Pressable, Text, View } from "react-native";
+import { BackHandler, Pressable, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
@@ -61,7 +61,7 @@ function Dashboard() {
     <View style={[styles.between, { paddingHorizontal: 24, paddingVertical: 12, borderBottomWidth: 1, borderColor: colors.border }]}><Text accessibilityLabel="Hale" style={styles.wordmark}>hale.</Text><View style={{ alignItems: "flex-end" }}><Text style={styles.small}>{space.name}</Text><Text style={styles.eyebrow}>{mode === "demo" ? "FICTIONAL DEMO" : "YOUR PRIVATE SPACE"}</Text></View></View>
     {phase === "recording" && (tab !== "today" || detail) && <View style={[styles.row, { paddingHorizontal: 24, paddingVertical: 10, backgroundColor: colors.blush }]}><Text accessibilityLiveRegion="polite" style={[styles.small, styles.grow]}>◉ Recording · {Math.floor(seconds / 60)} min</Text><Button title="Recording controls" tone="secondary" onPress={() => { setTab("today"); setDetail(undefined); }} /></View>}
     {detail && <View style={{ paddingHorizontal: 24, paddingTop: 8 }}><Button title="← Back to dashboard" tone="secondary" onPress={() => setDetail(undefined)} /></View>}
-    <KeyboardAvoidingView style={styles.grow} behavior={Platform.OS === "ios" ? "padding" : undefined}><View style={[styles.grow, detail && { display: "none" }]}>{screen}</View>{detail && <ConversationScreen key={detail.id} {...detail} back={() => setDetail(undefined)} />}</KeyboardAvoidingView>
+    <View style={styles.grow}><View style={[styles.grow, detail && { display: "none" }]}>{screen}</View>{detail && <ConversationScreen key={detail.id} {...detail} back={() => setDetail(undefined)} />}</View>
     <View accessibilityRole="tablist" style={styles.tabs}>{tabs.map((item) => <Pressable key={item.id} accessibilityRole="tab" accessibilityLabel={item.label} accessibilityState={{ selected: !detail && tab === item.id }} onPress={() => { setDetail(undefined); setTab(item.id); }} style={styles.tab}><Text style={[styles.tabIcon, tab === item.id && styles.tabActive]}>{item.symbol}</Text><Text style={[styles.tabText, tab === item.id && styles.tabActive]}>{item.label}</Text></Pressable>)}</View>
   </View>;
 }

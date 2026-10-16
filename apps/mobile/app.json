@@ -2,24 +2,17 @@
   "expo": {
     "name": "Hale",
     "slug": "hale-mobile",
+    "platforms": ["android"],
     "scheme": "hale",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "backgroundColor": "#FAF7F5",
     "icon": "./assets/icon.png",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "health.hale.mobile",
-      "infoPlist": {
-        "UIFileSharingEnabled": false,
-        "LSSupportsOpeningDocumentsInPlace": false,
-        "NSAppTransportSecurity": { "NSAllowsArbitraryLoads": false, "NSAllowsLocalNetworking": true }
-      }
-    },
     "android": {
       "package": "health.hale.mobile",
-      "allowBackup": false
+      "allowBackup": false,
+      "softwareKeyboardLayoutMode": "resize"
     },
     "plugins": [
       ["expo-audio", {

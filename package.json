@@ -19,11 +19,14 @@
   "scripts": {
     "dev": "bun run --parallel dev:web backend",
     "dev:web": "bun run --cwd apps/web dev",
+    "dev:mobile": "bun run --cwd apps/mobile dev",
+    "mobile:android": "bun run --cwd apps/mobile android",
+    "mobile:ios": "bun run --cwd apps/mobile ios",
     "build": "bun run --cwd apps/web build",
     "lint": "bun run --cwd apps/web lint",
-    "typecheck": "bun run --cwd apps/web typecheck && tsc --noEmit -p convex/tsconfig.json",
-    "test": "bun test packages convex apps/web/src/lib",
-    "check": "bun run test && bun run lint && bun run typecheck && bun run build",
+    "typecheck": "bun run --cwd apps/web typecheck && bun run --cwd apps/mobile typecheck && tsc --noEmit -p convex/tsconfig.json",
+    "test": "bun test packages convex apps/web/src/lib apps/mobile/src/lib",
+    "check": "bun run test && bun run lint && bun run typecheck && bun run --cwd apps/mobile check:native && bun run build",
     "production:check": "bun run --cwd apps/web production:check",
     "backend": "convex dev"
   }

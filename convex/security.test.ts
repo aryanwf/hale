@@ -82,6 +82,61 @@ describe("Convex authentication, isolation, and upload ownership", () => {
     const response = await t.fetch("/audio", { method: "POST", headers: { Origin: "https://untrusted.invalid", "Content-Type": "audio/mp4" }, body: "fake audio" });
     expect(response.status).toBe(403);
   });
+  test("originless native audio uploads still require authentication", async () => {
+    const { t } = await setup();
+    const response = await t.fetch("/audio", { method: "POST", headers: { "Content-Type": "audio/mp4" }, body: "consented test bytes" });
+    expect(response.status).toBe(401);
+  });
+  test("authenticated native uploads are accepted without a browser origin", async () => {
+    const { patient, sessionId } = await setup();
+    const capturedAt = Date.now();
+    const params = new URLSearchParams({ sessionId, sequence: "1", capturedAt: String(capturedAt), endedAt: String(capturedAt + 1) });
+    const response = await patient.fetch(`/audio?${params}`, { method: "POST", headers: { "Content-Type": "audio/mp4" }, body: "consented synthetic native bytes" });
+    expect(response.status).toBe(200);
+  });
+  test("an originless outsider cannot attach audio to another session", async () => {
+    const { t, sessionId } = await setup();
+    const capturedAt = Date.now();
+    const params = new URLSearchParams({ sessionId, sequence: "1", capturedAt: String(capturedAt), endedAt: String(capturedAt + 1) });
+    const response = await t.withIdentity({ subject: "outsider" }).fetch(`/audio?${params}`, { method: "POST", headers: { "Content-Type": "audio/mp4" }, body: "unauthorized bytes" });
+    expect(response.status).toBe(400);
+  });
+  test("an explicit null browser origin is rejected", async () => {
+    const { patient } = await setup();
+    const response = await patient.fetch("/audio", { method: "POST", headers: { Origin: "null", "Content-Type": "audio/mp4" }, body: "synthetic bytes" });
+    expect(response.status).toBe(403);
+  });
+  test("web recordings retain their two-minute timing limit", async () => {
+    const { t, patient, sessionId, args } = await setup();
+    const capturedAt = Date.now() - 180_000;
+    await t.run((ctx) => ctx.db.patch(sessionId, { startedAt: capturedAt }));
+    await expect(patient.mutation(app.internal.recordings.acceptChunk, { ...args, capturedAt, endedAt: capturedAt + 180_000 })).rejects.toThrow("timing");
+  });
+  test("native recordings accept a continuous one-hour file", async () => {
+    const { t, patient, patientId, args } = await setup();
+    const sessionId = await patient.mutation(app.api.recordings.start, { patientId, participantsConsented: true, captureMode: "native" });
+    const capturedAt = Date.now() - 3_600_000;
+    await t.run((ctx) => ctx.db.patch(sessionId, { startedAt: capturedAt }));
+    const result = await patient.mutation(app.internal.recordings.acceptChunk, { ...args, sessionId, capturedAt, endedAt: capturedAt + 3_600_000 });
+    expect(result.duplicate).toBe(false);
+  });
+  test("native recordings reject files longer than one hour", async () => {
+    const { t, patient, patientId, args } = await setup();
+    const sessionId = await patient.mutation(app.api.recordings.start, { patientId, participantsConsented: true, captureMode: "native" });
+    const capturedAt = Date.now() - 3_600_001;
+    await t.run((ctx) => ctx.db.patch(sessionId, { startedAt: capturedAt }));
+    await expect(patient.mutation(app.internal.recordings.acceptChunk, { ...args, sessionId, capturedAt, endedAt: capturedAt + 3_600_001 })).rejects.toThrow("timing");
+  });
+  test("closing a session is idempotent for upload retries", async () => {
+    const { patient, sessionId } = await setup();
+    await patient.mutation(app.api.recordings.setState, { sessionId, state: "stopped" });
+    expect(await patient.mutation(app.api.recordings.setState, { sessionId, state: "stopped" })).toBeNull();
+  });
+  test("an ended session cannot restart recording", async () => {
+    const { patient, sessionId } = await setup();
+    await patient.mutation(app.api.recordings.setState, { sessionId, state: "stopped" });
+    await expect(patient.mutation(app.api.recordings.setState, { sessionId, state: "recording" })).rejects.toThrow("ended");
+  });
   test("authenticated HTTP ingestion rechecks identity and cleans up duplicate upload files", async () => {
     const { t, patient, patientId, sessionId } = await setup();
     const previousOrigin = process.env.APP_ORIGIN;

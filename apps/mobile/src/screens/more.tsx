@@ -1,0 +1,28 @@
+import { Alert, Linking, Text, View } from "react-native";
+import { Button, Empty, Notice, Page } from "../components/ui";
+import { useCapture } from "../providers/capture";
+import { useWorkspace } from "../providers/workspace";
+import { config } from "../lib/config";
+import { styles } from "../theme";
+
+export function MoreScreen() {
+  const { space, mode, patients, selectPatient, signOut } = useWorkspace();
+  const { phase, hasActiveRecording, pending, uploading } = useCapture();
+  const busy = hasActiveRecording || ["starting", "saving"].includes(phase) || uploading;
+  function openVoiceProfile() {
+    if (!config.webUrl) { Alert.alert("Web dashboard not configured", "Set EXPO_PUBLIC_WEB_URL to manage your account’s voice profile on the web."); return; }
+    void Linking.openURL(new URL("/signup/voice", config.webUrl).toString()).catch(() => Alert.alert("Couldn’t open the dashboard", "Try opening Hale in your browser."));
+  }
+  return <Page eyebrow="YOUR SPACE, YOUR CHOICES" title="A little more\npeace of mind." description="Familiar people, your privacy, and the choices that stay yours.">
+    <Text style={styles.heading}>The voices you know.</Text>
+    {space.people.length ? space.people.map((person) => <View key={person.id} style={styles.card}><View style={styles.row}><View style={styles.avatar}><Text style={styles.title}>{person.initials}</Text></View><View style={styles.grow}><Text style={styles.title}>{person.name}</Text><Text style={styles.small}>{person.relationship}</Text></View></View><Text style={styles.small}>{mode === "demo" ? "Demo enrollment · no real voiceprint" : person.enrollment === "enrolled" ? "Voice enrolled with consent" : person.enrollment === "revoked" ? "Voice enrollment revoked" : "Voice not enrolled"}</Text><Text style={styles.small}>{space.conversations.filter((item) => item.people.includes(person.id)).length} linked conversations</Text></View>) : <Empty title="Your circle starts here." description="Familiar people will appear when profiles are added to your patient space." />}
+    <Notice>A person is more than a voice match. Profiles don’t grant account access, establish consent, or prove someone was physically present. Uncertain speakers stay unnamed. Account voiceprints are not yet matched to patient-space conversations.</Notice>
+    <Button title="Manage my voice profile on the web ↗" tone="secondary" onPress={openVoiceProfile} />
+    <View style={styles.card}><Text style={styles.heading}>Access & privacy</Text><Text style={styles.body}>Patient space: {space.name}</Text><Text style={styles.small}>Timezone: {space.timezone}</Text><Text style={styles.small}>{mode === "demo" ? "Synthetic demo data only" : "Server-side Convex membership and capability checks"}</Text><Text style={styles.small}>No blanket family access. Invitations are not connected yet. Voice enrollment never authorizes an account.</Text></View>
+    <View style={styles.card}><Text style={styles.heading}>What stays, and for how long</Text><Text style={styles.body}>Cloud audio · up to 7 days after upload</Text><Text style={styles.body}>Transcripts & memories · until the conversation is deleted</Text><Text style={styles.body}>Local audio · up to 3 recordings, until uploaded or discarded</Text><Text style={styles.small}>{pending.length} saved locally for this account and patient space. Queued audio is isolated by account and patient; it is not end-to-end encrypted. iOS device backups may contain local files. Android app backup is disabled.</Text><Text style={styles.small}>Uninstalling Hale or clearing app data removes unsent files. An interrupted file may be incomplete or unplayable. Cloud uploads are retried only when you tap upload; uploads are not guaranteed while backgrounded.</Text></View>
+    <View style={[styles.card, styles.blush]}><Text style={styles.heading}>A microphone with your say-so.</Text><Text style={styles.body}>Start while Hale is open. Capture continues when you switch apps or lock your screen.</Text><Text style={styles.small}>Android runs a microphone foreground service with a recording indicator and stop action. iOS uses its audio background mode and microphone privacy indicator. Phone calls, audio-route changes, force-stop, and battery policies can interrupt recording. There is no covert listening, automatic restart, or claim of uninterrupted coverage.</Text><Text style={styles.small}>One-hour native limit per recording. Pausing closes the file; resuming starts a new consented segment. Background recording can increase battery use.</Text></View>
+    {patients.length > 1 && <View style={styles.card}><Text style={styles.heading}>Patient spaces</Text>{patients.map((patient) => <Button key={patient.id} title={`${patient.id === space.id ? "✓  " : ""}${patient.name}`} tone="secondary" disabled={busy} onPress={() => selectPatient(patient.id)} />)}<Text style={styles.small}>Finish recording before changing patient spaces.</Text></View>}
+    <Button title={mode === "demo" ? "Reset fictional demo data" : "Sign out"} tone="secondary" disabled={busy} onPress={() => Alert.alert(mode === "demo" ? "Reset demo data?" : "Sign out?", "Saved audio stays in the app’s private storage and is only shown to its owning account and patient space. Discard local files first if this device is shared.", [{ text: "Go back", style: "cancel" }, { text: "Continue", onPress: () => { void signOut().catch(() => Alert.alert("Couldn’t sign out", "Please try again.")); } }])} />
+    <Notice>Use fictional identities and consented test audio only in this prototype. Audio transcription, memory extraction, speaker matching, and nightly summaries are not connected yet.</Notice>
+  </Page>;
+}

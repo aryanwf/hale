@@ -1,0 +1,10 @@
+{
+  "colors": {
+    "primary": "#9B2C2C",
+    "background": "#FAF7F5",
+    "foreground": "#1A1A1A",
+    "input": "#F0EBE8",
+    "border": "#E5DAD5"
+  },
+  "design": { "borderRadius": 16 }
+}

@@ -8,6 +8,12 @@
 
 > *healthcare, remembered.*
 
+## apps
+
+- `apps/web`: web patient and family dashboards.
+- `apps/mobile`: native Expo patient companion, migrated from `reference/mobile`. Start with `bun run mobile:android` or `bun run mobile:ios`; see [mobile setup and recording verification](apps/mobile/README.md).
+- Both clients share `packages/contracts` and the Convex backend. Native background capture is implemented but requires physical-device verification before release; Expo Go does not support this configuration.
+
 ## todo
 
 - [x] account signup, patient and family flows
@@ -26,8 +32,10 @@
 - [ ] memory extraction
 - [ ] speaker matching
 - [ ] nightly summaries
-- [ ] android, smartwatch, wearable capture
-- [ ] background recording
+- [x] Expo iOS/Android capture implementation
+- [x] native background recording configuration and durable upload queue
+- [ ] physical-device background capture verification
+- [ ] smartwatch and wearable capture
 
 ### family dashboard
 

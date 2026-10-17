@@ -13,7 +13,7 @@ assert.equal(config.android.softwareKeyboardLayoutMode, "resize");
 const native = config._internal.modResults;
 const manifest = native.android.manifest.manifest;
 const permissions = manifest["uses-permission"].map((permission) => permission.$["android:name"]);
-for (const name of ["RECORD_AUDIO", "POST_NOTIFICATIONS", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_MICROPHONE"]) {
+for (const name of ["CAMERA", "RECORD_AUDIO", "POST_NOTIFICATIONS", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_MICROPHONE"]) {
   assert(permissions.includes(`android.permission.${name}`), `Missing Android permission: ${name}`);
 }
 const application = manifest.application[0];
@@ -25,4 +25,4 @@ const service = application.service.find((entry) => entry.$["android:name"] === 
 assert(service, "Android microphone capture needs the native recording service.");
 assert.equal(service.$["android:foregroundServiceType"], "microphone");
 assert.equal(service.$["android:exported"], "false");
-console.log("Android target, keyboard resizing, microphone permissions, private storage, and foreground service verified.");
+console.log("Android target, keyboard resizing, camera and microphone permissions, private storage, and foreground service verified.");

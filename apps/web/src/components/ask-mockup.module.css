@@ -1,0 +1,701 @@
+.askMockup {
+  padding-bottom: 48px;
+}
+
+.intro {
+  padding: 38px 0 31px;
+}
+
+.eyebrow,
+.welcomeEyebrow,
+.messageLabel {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .075em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+}
+
+.intro h1 {
+  margin-top: 12px;
+  font-family: var(--font-sans);
+  font-size: clamp(32px, 3.2vw, 42px);
+  font-weight: 500;
+  letter-spacing: -.055em;
+  line-height: 1.18;
+  text-wrap: balance;
+}
+
+.intro h1 span {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.introDescription {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.content {
+  width: min(100%, 1140px);
+  margin: 0 auto;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 258px;
+  align-items: stretch;
+  gap: 21px;
+}
+
+.chatPanel {
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--ground);
+}
+
+.toolbar {
+  display: flex;
+  min-height: 74px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 22px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.assistantIdentity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+}
+
+.assistantIcon,
+.welcomeOrb,
+.responseIcon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blush);
+  color: var(--accent);
+}
+
+.assistantIcon {
+  width: 36px;
+  height: 36px;
+}
+
+.assistantCopy {
+  display: grid;
+  gap: 1px;
+}
+
+.assistantCopy strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.assistantCopy > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.scopePill {
+  display: inline-flex;
+  min-height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--shade);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.clearScope {
+  display: inline-grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  margin: -2px -5px -2px 0;
+  border-radius: 50%;
+}
+
+.clearScope:hover {
+  background: var(--ground);
+  color: var(--accent);
+}
+
+.welcome {
+  display: grid;
+  grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
+  align-items: center;
+  gap: 38px;
+  padding: 32px 30px;
+}
+
+.welcomeCopy {
+  min-width: 0;
+}
+
+.welcomeOrb {
+  width: 43px;
+  height: 43px;
+  margin-bottom: 18px;
+}
+
+.welcomeEyebrow {
+  color: var(--accent);
+  font-size: 9px;
+}
+
+.welcomeCopy h2 {
+  max-width: 360px;
+  margin-top: 8px;
+  font-family: var(--font-sans);
+  font-size: clamp(21px, 2vw, 27px);
+  font-weight: 500;
+  letter-spacing: -.045em;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.welcomeDescription {
+  max-width: 340px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.suggestions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.suggestions button {
+  display: flex;
+  min-height: 59px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 13px;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  background: var(--ground);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: left;
+  transition: color var(--fast) ease, background var(--fast) ease, border-color var(--fast) ease, transform var(--fast) var(--ease-out);
+}
+
+.suggestions button > span {
+  min-width: 0;
+}
+
+.suggestions button > svg {
+  color: var(--muted);
+  transition: color var(--fast) ease, transform var(--medium) var(--ease-out);
+}
+
+.suggestions button:hover {
+  transform: translateY(-1px);
+  border-color: var(--rule-strong);
+  background: var(--shade);
+  color: var(--ink);
+}
+
+.suggestions button:hover > svg {
+  transform: translateX(2px);
+  color: var(--accent);
+}
+
+.exchanges:empty {
+  display: none;
+}
+
+.exchanges:not(:empty) {
+  padding: 26px 30px 8px;
+}
+
+.exchange + .exchange {
+  margin-top: 25px;
+  padding-top: 24px;
+  border-top: 1px solid var(--rule);
+}
+
+.userMessage {
+  width: fit-content;
+  max-width: min(82%, 650px);
+  margin-left: auto;
+  padding: 12px 16px;
+  border-radius: 12px 12px 3px 12px;
+  background: var(--shade);
+}
+
+.messageLabel {
+  display: block;
+  font-size: 9px;
+}
+
+.userMessage > p {
+  margin-top: 3px;
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.assistantMessage {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 22px 3px 14px;
+}
+
+.responseIcon {
+  width: 29px;
+  height: 29px;
+}
+
+.responseContent {
+  min-width: 0;
+  flex: 1;
+  padding-top: 3px;
+}
+
+.responseContent > .messageLabel {
+  color: var(--accent);
+}
+
+.resolvedScope {
+  margin-top: 7px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.answerText,
+.loadingAnswer {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.loadingAnswer {
+  color: var(--muted);
+}
+
+.citationList {
+  display: grid;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.citation {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  color: var(--accent);
+  transition: background var(--fast) ease, border-color var(--fast) ease;
+}
+
+.citation:hover {
+  border-color: var(--rule-strong);
+  background: var(--shade);
+}
+
+.citation > span {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 3px;
+}
+
+.citation strong {
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.citation span > span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.askForm {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 3px 22px 0;
+  padding: 9px 9px 9px 16px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 9px;
+  background: var(--ground);
+  transition: border-color var(--fast) ease, box-shadow var(--fast) ease;
+}
+
+.askForm:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px #9B2C2C26;
+}
+
+.askForm textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  max-height: 120px;
+  padding-top: 5px;
+  resize: none;
+  overflow-y: auto;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 13px;
+  line-height: 1.6;
+  transition: height var(--fast) var(--ease-out);
+}
+
+.askForm textarea::placeholder {
+  color: var(--muted);
+  opacity: .85;
+}
+
+.sendButton {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--ground);
+  transition: background var(--fast) ease, transform var(--fast) var(--ease-out);
+}
+
+.sendButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: var(--accent-deep);
+}
+
+.chatFootnote {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 9px 24px 17px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.chatFootnote i {
+  padding: 0 3px;
+  font-style: normal;
+}
+
+.explorePanel {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  align-self: stretch;
+  flex-direction: column;
+  padding: 17px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--ground);
+}
+
+.sideHeading {
+  margin: 1px 0 13px;
+}
+
+.sideEyebrow {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: .075em;
+}
+
+.sideHeading h2 {
+  margin-top: 5px;
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -.035em;
+}
+
+.resourceLinks {
+  display: grid;
+  flex: 1;
+  align-content: stretch;
+  grid-template-rows: repeat(3, minmax(63px, 1fr));
+  gap: 7px;
+}
+
+.resourceLinks a {
+  display: grid;
+  min-width: 0;
+  min-height: 63px;
+  grid-template-columns: 34px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  color: var(--muted);
+  transition: color var(--fast) ease, background var(--fast) ease, border-color var(--fast) ease;
+}
+
+.resourceLinks a:hover {
+  border-color: var(--rule-strong);
+  background: var(--shade);
+  color: var(--accent);
+}
+
+.resourceIcon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--blush);
+  color: var(--accent);
+}
+
+.resourceCopy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.resourceCopy strong {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.resourceCopy > span {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.resourceLinks a > svg:last-child {
+  transition: transform var(--medium) var(--ease-out);
+}
+
+.resourceLinks a:hover > svg:last-child {
+  transform: translateX(2px);
+}
+
+.groundingNote {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: var(--shade);
+  color: var(--accent);
+}
+
+.groundingNote > svg {
+  flex: 0 0 auto;
+}
+
+.groundingCopy {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.groundingNote h2 {
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.groundingNote p {
+  flex: 1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  .intro {
+    padding: 32px 0 24px;
+  }
+
+  .welcome {
+    grid-template-columns: 1fr;
+    gap: 23px;
+    padding: 26px 22px;
+  }
+
+  .welcomeOrb {
+    margin-bottom: 13px;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+}
+
+@media (max-width: 560px) {
+  .askMockup {
+    padding-bottom: 30px;
+  }
+
+  .intro {
+    padding: 27px 0 22px;
+  }
+
+  .intro h1 {
+    font-size: 31px;
+  }
+
+  .introDescription {
+    max-width: 38ch;
+    font-size: 13px;
+  }
+
+  .toolbar {
+    min-height: 65px;
+    gap: 8px;
+    padding: 11px 13px;
+  }
+
+  .assistantCopy > span {
+    max-width: 175px;
+    font-size: 9px;
+  }
+
+  .scopePill {
+    gap: 5px;
+    padding: 5px 7px;
+    font-size: 9px;
+  }
+
+  .scopePill > svg {
+    width: 13px;
+  }
+
+  .welcome {
+    gap: 19px;
+    padding: 23px 17px;
+  }
+
+  .welcomeCopy h2 {
+    font-size: 22px;
+  }
+
+  .suggestions {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .suggestions button {
+    min-height: 48px;
+    padding: 10px 12px;
+    font-size: 11px;
+  }
+
+  .exchanges:not(:empty) {
+    padding: 20px 14px 6px;
+  }
+
+  .userMessage {
+    max-width: 90%;
+    padding: 11px 13px;
+  }
+
+  .userMessage > p,
+  .answerText,
+  .loadingAnswer {
+    font-size: 13px;
+  }
+
+  .askForm {
+    margin: 4px 12px 0;
+    padding-left: 12px;
+  }
+
+  .askForm textarea {
+    font-size: 16px;
+  }
+
+  .chatFootnote {
+    margin: 8px 14px 14px;
+    font-size: 8px;
+  }
+
+  .chatFootnote > span:first-child {
+    display: none;
+  }
+
+  .resourceLinks {
+    gap: 7px;
+  }
+
+  .groundingNote {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .groundingCopy {
+    display: grid;
+    gap: 3px;
+  }
+
+  .groundingNote h2 {
+    white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .suggestions button,
+  .suggestions button > svg,
+  .askForm,
+  .askForm textarea,
+  .sendButton,
+  .citation,
+  .resourceLinks a,
+  .resourceLinks a > svg:last-child {
+    transition: none;
+  }
+}

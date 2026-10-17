@@ -1,2 +1,2 @@
-import { PeopleView } from "@/components/people";
-export default function PeoplePage() { return <PeopleView />; }
+import { PeopleMockupView } from "@/components/people-mockup";
+export default function PeoplePage() { return <PeopleMockupView />; }

@@ -18,13 +18,13 @@ export function SegmentedControl<T extends string>({ value, options, onChange, l
   })}</View>;
 }
 export function Page({ eyebrow, title, description, children }: { eyebrow: string; title: string; description?: string; children: ReactNode }) {
-  return <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"><View style={styles.stack}><Text style={styles.eyebrow}>{eyebrow}</Text><Text accessibilityRole="header" style={styles.headline}>{title}</Text>{description && <Text style={[styles.body, styles.muted]}>{description}</Text>}</View>{children}</ScrollView>;
+  return <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"><View style={styles.pageIntro}><Text style={styles.eyebrow}>{eyebrow}</Text><Text accessibilityRole="header" style={styles.headline}>{title}</Text>{description && <Text style={[styles.body, styles.muted]}>{description}</Text>}</View>{children}</ScrollView>;
 }
 export function Notice({ children }: { children: ReactNode }) {
   return <View style={[styles.card, styles.quiet]}><Text style={styles.small}>{children}</Text></View>;
 }
 export function Empty({ title, description }: { title: string; description?: string }) {
-  return <View style={styles.card}><Text style={styles.heading}>{title}</Text>{description && <Text style={styles.small}>{description}</Text>}</View>;
+  return <View style={[styles.card, styles.empty]}><Text style={[styles.title, { textAlign: "center" }]}>{title}</Text>{description && <Text style={[styles.small, { textAlign: "center" }]}>{description}</Text>}</View>;
 }
 export function Loading({ message = "A moment for your memories…" }: { message?: string }) {
   return <View style={[styles.screen, { justifyContent: "center", padding: 32, gap: 20 }]}><ActivityIndicator color={colors.burgundy} /><Text style={[styles.body, { textAlign: "center" }]}>{message}</Text></View>;

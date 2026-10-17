@@ -30,11 +30,11 @@ import type { DataModel } from "./dataModel.js";
 type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
-  readonly FAMILY_SUMMARIES_ENABLED?: string;
-  readonly FAMILY_SUMMARIES_EMAIL_MODE?: string;
-  readonly FAMILY_SUMMARIES_TEST_EMAIL?: string;
-  readonly FAMILY_SUMMARIES_FROM_EMAIL?: string;
-  readonly RESEND_API_KEY?: string;
+  readonly FAMILY_SUMMARIES_EMAIL_MODE: string | undefined;
+  readonly FAMILY_SUMMARIES_ENABLED: string | undefined;
+  readonly FAMILY_SUMMARIES_FROM_EMAIL: string | undefined;
+  readonly FAMILY_SUMMARIES_TEST_EMAIL: string | undefined;
+  readonly RESEND_API_KEY: string | undefined;
 };
 
 /**

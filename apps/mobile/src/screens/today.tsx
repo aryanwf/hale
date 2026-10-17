@@ -16,28 +16,26 @@ export function TodayScreen({ open, ask, care, memories }: { open: OpenConversat
     <View style={styles.pageIntro}>
       <View style={styles.row}><Sun size={16} color={colors.muted} strokeWidth={1.7} /><Text style={styles.eyebrow}>{dateLabel(today)}</Text></View>
       <Text accessibilityRole="header" style={styles.headline}>Welcome,{"\n"}<Text style={styles.greetingName}>{space.name.split(" ")[0]}.</Text></Text>
-      <Text style={[styles.body, styles.muted]}>Your recordings and memories for today.</Text>
     </View>
-    <RecordingCard open={open} />
+    <RecordingCard />
     <LegacyRecordings />
     <Pressable accessibilityRole="button" onPress={ask} style={[styles.card, styles.quiet, styles.row]}>
       <View style={styles.recordIcon}><Sparkles size={23} color={colors.burgundy} strokeWidth={1.7} /></View>
-      <View style={styles.grow}><Text style={styles.title}>Looking for a memory?</Text><Text style={styles.small}>Ask about what’s been recorded.</Text></View>
+      <View style={styles.grow}><Text style={styles.title}>Ask about a memory</Text></View>
       <ArrowRight size={20} color={colors.burgundy} />
     </Pressable>
     <View style={styles.section}>
       <View style={styles.between}><Text style={styles.heading}>Memories from today</Text><Pressable accessibilityRole="button" onPress={memories} style={{ minHeight: 44, justifyContent: "center" }}><Text style={styles.textLink}>View day →</Text></Pressable></View>
-      {todaysMemories.length ? todaysMemories.slice(0, 2).map((memory) => <MemoryCard key={memory.id} memory={memory} open={open} />) : <Empty title="No saved memories yet" description="Your transcript is saved in conversations. Memory extraction isn’t connected yet; an empty day doesn’t mean nothing happened." />}
+      {todaysMemories.length ? todaysMemories.slice(0, 2).map((memory) => <MemoryCard key={memory.id} memory={memory} open={open} />) : <Empty title="No saved memories yet" />}
     </View>
     <View style={styles.section}>
       <Text style={styles.heading}>Today’s conversations</Text>
       <View style={{ borderTopWidth: 1, borderColor: colors.ink }}>
-        {conversations.length ? conversations.slice(0, 5).map((conversation) => <ConversationCard key={conversation.id} conversation={conversation} open={open} />) : <Empty title="A little space for your day" description="Switch recording on with everyone’s agreement. New dialogue will appear in one ongoing conversation." />}
+        {conversations.length ? conversations.slice(0, 5).map((conversation) => <ConversationCard key={conversation.id} conversation={conversation} open={open} />) : <Empty title="No conversations yet" />}
       </View>
     </View>
     <Pressable accessibilityRole="button" onPress={care} style={[styles.row, { borderTopWidth: 1, borderColor: colors.border, paddingVertical: 24, marginTop: 12 }]}>
       <CalendarDays size={22} color={colors.burgundy} strokeWidth={1.7} /><View style={styles.grow}><Text style={styles.title}>Care and everyday tasks</Text><Text style={styles.small}>Connected services are not available yet.</Text></View><ArrowRight size={18} color={colors.burgundy} />
     </Pressable>
-    <Text style={[styles.small, { fontSize: 11 }]}>Hale helps you remember. It is not a medical service. Recordings may be incomplete.</Text>
   </ScrollView>;
 }

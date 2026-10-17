@@ -41,7 +41,7 @@ function LiveAuth({ signup }: { signup: boolean }) {
 
   if (isSignedIn) {
     const nextStep = signup
-      ? "Next, share your family code. After your loved one connects, complete voice enrollment to finish setup."
+      ? "Next, share your family code. After your loved one connects, you can optionally set up voice enrollment."
       : "Your family dashboard is waiting for you.";
 
     return (
@@ -70,7 +70,7 @@ export function AuthPage({ signup = false }: { signup?: boolean }) {
   const live = appMode === "live";
   const introDescription = !signup
     ? "Log in to see the conversations and little moments your loved one shares with you."
-    : "Create your family account and share a private family code. After your loved one connects, complete voice enrollment to finish setup.";
+    : "Create your family account and share a private family code. After your loved one connects, you can optionally set up voice enrollment.";
 
   return (
     <AuthShell signup={signup}>

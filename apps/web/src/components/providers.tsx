@@ -93,7 +93,7 @@ function LiveGate({ children }: { children: ReactNode }) {
 
 function Onboarding() {
   return <Gate title="Welcome to your family dashboard." description="Start by connecting with your loved one. Patient spaces are created in the Android app, not here.">
-    <UserButton /><FamilyConnection /><Link href="/signup/voice" className="text-link">Optional: set up your family voice profile<ArrowRight size={16} /></Link>
+    <UserButton /><FamilyConnection /><Link href="/signup/voice" className="text-link">Optional: set up your family voice profile<ArrowRight size={16} /></Link><p className="small muted"><Link href="/account/delete">Delete account</Link></p>
   </Gate>;
 }
 

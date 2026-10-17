@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "expo start --dev-client --lan --port 0",
     "dev:usb": "node scripts/start-android-usb.mjs",
-    "android": "expo run:android",
+    "android": "expo prebuild --platform android --no-install && expo run:android",
     "build:apk": "node scripts/build-android-apk.mjs",
     "typecheck": "tsc --noEmit",
     "check:native": "node scripts/check-native-config.mjs",

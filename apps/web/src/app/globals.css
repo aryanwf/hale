@@ -947,6 +947,9 @@ a, .text-link, .icon-button, .back-link, .patient-view-link, .family-tabs a, .pa
 .family-code { font-size: clamp(17px, 3vw, 25px); letter-spacing: .06em; overflow-wrap: anywhere; user-select: all; color: #7e2525; }
 .family-qr { background: white; border-radius: 12px; padding: 8px; max-width: 100%; }
 .family-qr svg { display: block; width: min(208px, 100%); height: auto; }
+.account-danger { border-color: var(--accent); margin-top: 24px; }
+.account-danger .icon-label { color: var(--accent); }
+.deletion-details { list-style: disc; padding-left: 20px; display: grid; gap: 12px; line-height: 1.7; }
 .connection-steps { list-style: none; padding: 0; margin: 32px 0; display: grid; gap: 24px; }
 .connection-steps li { display: flex; gap: 16px; align-items: flex-start; }
 .connection-steps svg { flex-shrink: 0; color: #9b2c2c; }

@@ -2,9 +2,17 @@ import { ConvexError, type GenericId } from "convex/values";
 import type { Capability } from "@hale/contracts";
 import type { QueryCtx } from "./lib/functions";
 
-export async function requireIdentity(ctx: Pick<QueryCtx, "auth">) {
+export async function hashIdentity(tokenIdentifier: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(tokenIdentifier));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export async function requireIdentity(ctx: Pick<QueryCtx, "auth" | "db">) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new ConvexError("Please sign in.");
+  const identityHash = await hashIdentity(identity.tokenIdentifier);
+  const deleted = await ctx.db.query("deletedAccounts").withIndex("by_identityHash", (q) => q.eq("identityHash", identityHash)).unique();
+  if (deleted) throw new ConvexError("Your Hale account was deleted. Finish deleting your sign-in account or create a new account.");
   return identity;
 }
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { Conversation } from "@hale/contracts";
 import { dateLabel, localDate } from "@hale/contracts/time";
-import { ConversationCard, MemoryCard, type OpenConversation } from "../components/evidence";
+import { ConversationGroupList, MemoryCard, type OpenConversation } from "../components/evidence";
 import { Button, Empty, Field, Notice, Page } from "../components/ui";
 import { useWorkspace } from "../providers/workspace";
 import { styles } from "../theme";
@@ -63,7 +63,7 @@ export function MemoriesScreen({ open, ask }: { open: OpenConversation; ask(day?
     <Text style={styles.heading}>Conversations</Text>
     {!!error && <Notice>{error}</Notice>}
     {!error && !results && <Text accessibilityLiveRegion="polite" style={styles.small}>Searching…</Text>}
-    {results?.conversations.map((item) => <View key={item.id} style={styles.stack}><Text style={styles.eyebrow}>{dateLabel(localDate(item.startedAt, space.timezone))}</Text><ConversationCard conversation={item} open={open} /></View>)}
+    {results && <ConversationGroupList conversations={results.conversations} open={open} showDate />}
     {results && !results.conversations.length && <Empty title="No matching conversations" description="Try another search or date." />}
     {results?.limited && <Notice>Showing a limited set of results. Choose a date or add a search word to narrow them.</Notice>}
   </Page>;

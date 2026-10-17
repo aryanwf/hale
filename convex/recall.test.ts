@@ -41,6 +41,16 @@ describe("live, authorized source-bound recall and search", () => {
     expect(answer.citations[0].turnId).toBe(turnId);
     expect(answer.citations[0].excerpt).toBe("I would bring the photo album on Sunday.");
   });
+  test("conversation results include session and clip ordering metadata", async () => {
+    const { owner, patientId, conversationId } = await setup();
+    const space = await owner.query(app.api.conversations.space, { patientId });
+    const conversation = space.conversations.find((item) => item.id === conversationId);
+    const search = await owner.query(app.api.conversations.search, { patientId, text: "conversation" });
+    const searchedConversation = search.conversations.find((item) => item.id === conversationId);
+
+    expect(conversation).toMatchObject({ recordingSessionId: expect.any(String), sequence: 0 });
+    expect(searchedConversation).toMatchObject({ recordingSessionId: expect.any(String), sequence: 0 });
+  });
   test("a selected calendar day cannot leak another day's evidence", async () => {
     const { owner, patientId } = await setup();
     const answer = await owner.query(app.api.assistant.recall, { patientId, question: "What about Sunday?", day: "2026-10-13" });

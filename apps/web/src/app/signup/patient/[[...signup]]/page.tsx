@@ -1,5 +1,3 @@
-import type { Metadata } from "next";
-import { AuthPage } from "@/components/auth-form";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Create your memory space" };
-export default function PatientSignupPage() { return <AuthPage signup patient />; }
+export default function PatientSignupPage() { redirect("/signup"); }

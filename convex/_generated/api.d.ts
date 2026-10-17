@@ -12,6 +12,7 @@ import type * as assistant from "../assistant.js";
 import type * as authz from "../authz.js";
 import type * as conversations from "../conversations.js";
 import type * as crons from "../crons.js";
+import type * as families from "../families.js";
 import type * as http from "../http.js";
 import type * as lib_functions from "../lib/functions.js";
 import type * as lib_sarvam from "../lib/sarvam.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   authz: typeof authz;
   conversations: typeof conversations;
   crons: typeof crons;
+  families: typeof families;
   http: typeof http;
   "lib/functions": typeof lib_functions;
   "lib/sarvam": typeof lib_sarvam;

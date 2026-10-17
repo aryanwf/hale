@@ -9,7 +9,8 @@ import type { PatientSpace } from "@hale/contracts";
 import { demoSpace, DEMO_TODAY } from "@hale/contracts/demo";
 import { localDate } from "@hale/contracts/time";
 import { api, type PatientInfo } from "@/lib/api";
-import { ArrowRight, Leaf, ShieldCheck } from "lucide-react";
+import { ArrowRight, Leaf } from "lucide-react";
+import { FamilyConnection } from "./family-connection";
 import { appMode } from "@/lib/app-mode";
 
 export interface SegmentUpload { blob: Blob; sequence: number; capturedAt: number; endedAt: number }
@@ -78,10 +79,10 @@ function LiveSpace({ patientId, patients, selectPatient, children }: { patientId
 function LiveGate({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth();
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
-  const patients = useQuery(api.patients, isAuthenticated ? {} : "skip");
+  const patients = useQuery(api.patients, isAuthenticated ? { role: "family" } : "skip");
   const [selected, setSelected] = useState<string>();
   if (!isLoaded) return <Gate title="A moment for your memories…" />;
-  if (!isSignedIn) return <Gate title="Your memories. Your space." description="Sign in to open your private memory bank. Only people you authorize can access it."><div className="button-group"><Link href="/login" className="btn btn-primary">Log in <ArrowRight size={17} /></Link><Link href="/signup" className="btn btn-quiet">Create an account</Link></div></Gate>;
+  if (!isSignedIn) return <Gate title="A little closer, even from afar." description="Sign in to see the memories your loved one shares with your family account."><div className="button-group"><Link href="/login" className="btn btn-primary">Log in <ArrowRight size={17} /></Link><Link href="/signup" className="btn btn-quiet">Create a family account</Link></div></Gate>;
   if (authLoading) return <Gate title="Connecting securely…" />;
   if (!isAuthenticated) return <Gate title="Your memory connection needs attention." description="Your account is signed in, but Convex could not authenticate it. Check the Clerk convex JWT template and deployment issuer configuration."><UserButton /></Gate>;
   if (!patients) return <Gate title="Finding your memory space…" />;
@@ -91,24 +92,8 @@ function LiveGate({ children }: { children: ReactNode }) {
 }
 
 function Onboarding() {
-  const createPatient = useMutation(api.createPatient);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  return <Gate title="A little introduction." description="Create your own patient space. For this prototype, use a fictional name and consented test audio only.">
-    <form className="onboarding-form" onSubmit={async (event) => {
-      event.preventDefault(); setBusy(true); setError("");
-      const data = new FormData(event.currentTarget);
-      try { await createPatient({ name: String(data.get("name")), timezone: String(data.get("timezone")), recordingConsent: data.get("consent") === "on" }); }
-      catch { setError("We couldn’t create your space. Check your details and try again."); }
-      finally { setBusy(false); }
-    }}>
-      <label>Your display name<input name="name" required minLength={2} maxLength={100} placeholder="e.g. Margaret Okafor" /></label>
-      <label>Your timezone<input name="timezone" required defaultValue={Intl.DateTimeFormat().resolvedOptions().timeZone} /></label>
-      <div className="notice"><ShieldCheck size={20} /><p>Audio playback expires after 7 days; a periodic job deletes the files. Transcripts remain until deleted. Cloud processing is not end-to-end encrypted. This prototype is not a medical service.</p></div>
-      <label className="check-label"><input type="checkbox" name="consent" required /><span>I understand this processing and consent to test recordings. Everyone in each conversation must also agree.</span></label>
-      {error && <p role="alert" className="error-text">{error}</p>}
-      <button className="btn btn-primary" disabled={busy}>{busy ? "Creating…" : "Create my space"}<ArrowRight size={17} /></button>
-    </form>
+  return <Gate title="Welcome to your family dashboard." description="Start by connecting with your loved one. Patient spaces are created in the Android app, not here.">
+    <UserButton /><FamilyConnection /><Link href="/signup/voice" className="text-link">Optional: set up your family voice profile<ArrowRight size={16} /></Link>
   </Gate>;
 }
 
@@ -126,7 +111,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   if (appMode === "demo") return <DemoProvider>{children}</DemoProvider>;
   if (appMode === "invalid") return <Gate title="Choose a valid app mode." description="NEXT_PUBLIC_APP_MODE must be demo or live. An invalid configuration never silently opens a different data source." />;
   if (!convex || !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return <Gate title="Your live connection isn’t configured." description="Set the Clerk and Convex variables in apps/web/.env.local, or explicitly select demo mode. Private data is never replaced with demo data after a connection error." />;
-  return <ClerkProvider signInUrl="/login" signUpUrl="/signup" signInFallbackRedirectUrl="/family/overview" signUpFallbackRedirectUrl="/signup/voice"><ConvexProviderWithClerk client={convex} useAuth={useAuth}>{children}</ConvexProviderWithClerk></ClerkProvider>;
+  return <ClerkProvider signInUrl="/login" signUpUrl="/signup" signInFallbackRedirectUrl="/family/overview" signUpFallbackRedirectUrl="/family/overview"><ConvexProviderWithClerk client={convex} useAuth={useAuth}>{children}</ConvexProviderWithClerk></ClerkProvider>;
 }
 
 // Public auth/onboarding routes need identity/backend providers, not a patient workspace.

@@ -766,3 +766,18 @@ a, .text-link, .icon-button, .back-link, .patient-view-link, .family-tabs a, .pa
 }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+/* Family pairing remains usable on narrow screens and with long private codes. */
+.family-connection { max-width: 760px; margin: 32px auto; padding: clamp(24px, 5vw, 48px); border: 1px solid #e5ddd5; border-radius: 16px; background: #fffdf9; text-align: left; }
+.gate:has(.family-connection) { max-width: 820px; padding-top: 36px; }
+.connection-icon { display: inline-flex; padding: 16px; background: #f3e9e3; color: #9b2c2c; border-radius: 50%; margin-bottom: 24px; }
+.family-connection h2 { font-size: clamp(28px, 4vw, 42px); line-height: 1.15; margin: 14px 0 22px; }
+.family-connection h2 span { font-weight: 400; }
+.family-connection > p { line-height: 1.7; }
+.family-code-box { display: flex; flex-direction: column; align-items: flex-start; gap: 18px; background: #f6f1eb; border: 1px dashed #c8b9ad; border-radius: 10px; padding: 24px; margin: 28px 0 14px; }
+.family-code { font-size: clamp(17px, 3vw, 25px); letter-spacing: .06em; overflow-wrap: anywhere; user-select: all; color: #7e2525; }
+.family-qr { background: white; border-radius: 12px; padding: 8px; max-width: 100%; }
+.family-qr svg { display: block; width: min(208px, 100%); height: auto; }
+.connection-steps { list-style: none; padding: 0; margin: 32px 0; display: grid; gap: 24px; }
+.connection-steps li { display: flex; gap: 16px; align-items: flex-start; }
+.connection-steps svg { flex-shrink: 0; color: #9b2c2c; }
+.connection-steps p { margin: 6px 0 0; line-height: 1.6; color: #6b625e; }

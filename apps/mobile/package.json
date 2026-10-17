@@ -22,6 +22,7 @@
     "expo": "~57.0.30",
     "expo-audio": "~57.0.5",
     "expo-auth-session": "~57.0.16",
+    "expo-camera": "~57.0.6",
     "expo-constants": "~57.0.22",
     "expo-crypto": "~57.0.4",
     "expo-dev-client": "~57.0.20",
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
+    "babel-preset-expo": "~57.0.16",
     "@types/react": "~19.2.0",
     "typescript": "~6.0.3"
   },

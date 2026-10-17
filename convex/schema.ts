@@ -2,6 +2,11 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  familyCodes: defineTable({
+    owner: v.string(), subject: v.string(), code: v.string(), name: v.optional(v.string()),
+    createdAt: v.number(), expiresAt: v.number(),
+    patientId: v.optional(v.id("patients")), acceptedAt: v.optional(v.number()),
+  }).index("by_owner", ["owner"]).index("by_code", ["code"]),
   // Account-owned enrollment is separate from patient membership. Never expose voiceprints in public queries.
   familyProfiles: defineTable({
     subject: v.string(), name: v.string(), relationship: v.string(),

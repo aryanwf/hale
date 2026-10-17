@@ -8,7 +8,7 @@ import { FamilyLink } from "../components/family-link";
 
 export function MoreScreen() {
   const { space, mode, patients, selectPatient, signOut } = useWorkspace();
-  const { phase, hasActiveRecording, pending, uploading } = useCapture();
+  const { phase, hasActiveRecording, pendingCount, uploading, needsFinalization } = useCapture();
   const busy = hasActiveRecording || ["starting", "saving"].includes(phase) || uploading;
 
   function openVoiceProfile() {
@@ -50,9 +50,9 @@ export function MoreScreen() {
       <Text style={styles.heading}>What Hale stores</Text>
        <Text style={styles.small}>Uploaded audio · temporary for transcription and selected speaker matching, then deleted; stalled processing expires in about 24 hours</Text>
        <Text style={styles.small}>Transcripts and memories · until you delete the conversation</Text>
-       <Text style={styles.small}>Unsent temporary audio · up to 3 files on this device until upload or discard</Text>
+        <Text style={styles.small}>Unsent temporary audio · up to five minutes on this device until upload or discard. Recording stops if this queue fills.</Text>
       <View style={styles.divider} />
-      <Text style={styles.small}>{pending.length} saved locally for this account and patient space.</Text>
+      <Text style={styles.small}>{pendingCount} segments saved locally for this account and patient space.{needsFinalization ? " Finishing the previous session." : ""}</Text>
       <Text style={styles.small}>Local audio is not app-encrypted. Uninstalling Hale or clearing app data removes unsent files. An interrupted file may be incomplete.</Text>
        <Text style={styles.small}>Cloud processing is not end-to-end encrypted. Providers receive audio to perform transcription and optional speaker matching; their independent retention is governed by their terms.</Text>
     </View>
@@ -61,8 +61,8 @@ export function MoreScreen() {
       <Text style={styles.eyebrow}>RECORDING</Text>
       <Text style={styles.heading}>The microphone stays in your control</Text>
       <Text style={styles.small}>Start while Hale is open and everyone agrees. A microphone indicator stays visible during capture.</Text>
-      <Text style={styles.small}>Calls, route changes, force-stop, or battery settings may interrupt recording. Hale does not restart automatically. Pausing starts a new segment.</Text>
-      <Text style={styles.small}>Each recording stops after one hour. Background recording can use more battery.</Text>
+      <Text style={styles.small}>Switch recording on once to keep listening, even with the screen locked. Switch it off here or in the Android notification. Calls, force-stop, or battery policies can interrupt capture; Hale never restarts it automatically.</Text>
+      <Text style={styles.small}>Audio is sent to Sarvam in ten-second segments. Dialogue appears after processing, not word by word. Continuous capture uses battery, mobile data, and your Sarvam API quota. Live speakers remain unknown; voice matching is not run for this mode.</Text>
     </View>
 
     {patients.length > 1 && <View style={styles.card}>

@@ -1,6 +1,6 @@
 import { Component, useState, type ReactNode } from "react";
 import { Alert, Text, View } from "react-native";
-import { useQuery } from "convex/react";
+import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "@hale/contracts/api";
 import type { Conversation, Memory, TranscriptTurn } from "@hale/contracts";
 import { durationLabel } from "@hale/contracts/time";
@@ -17,11 +17,11 @@ class SourceBoundary extends Component<{ children: ReactNode; back(): void }, { 
     return this.state.failed ? <Page eyebrow="SOURCE UNAVAILABLE" title="Conversation unavailable."><Notice>Please try again later.</Notice><Button title="Go back" onPress={this.props.back} /></Page> : this.props.children;
   }
 }
-function DetailBody({ detail, timestamp, back }: { detail: Detail; timestamp: number; back(): void }) {
+function DetailBody({ detail, timestamp, back, more }: { detail: Detail; timestamp: number; back(): void; more?: ReactNode }) {
   const workspace = useWorkspace();
   const { conversation, turns } = detail;
   const [busy, setBusy] = useState(false);
-  const { phase, pending, uploading } = useCapture();
+  const { phase, pendingCount, uploading } = useCapture();
   const processingLabel = { queued: "Queued", processing: "Processing", ready: "Ready", failed: "Could not process" }[conversation.state];
   function confirmDelete() {
     Alert.alert("Delete this conversation?", "Audio, transcript, and memories will be deleted. This can’t be undone.", [{ text: "Keep it", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => {
@@ -33,17 +33,19 @@ function DetailBody({ detail, timestamp, back }: { detail: Detail; timestamp: nu
     <Text style={styles.eyebrow}>{conversation.synthetic ? "FICTIONAL DEMO" : processingLabel} · {durationLabel(conversation.duration)}</Text>
     <Notice>{conversation.synthetic ? "No real audio is attached to fictional conversations." : "Hale deletes temporary audio after transcription and any selected speaker matching. Only transcript text remains until you delete it; processing providers receive audio to perform these tasks."}</Notice>
     <Text style={styles.heading}>Conversation transcript</Text>
-    {turns.length ? turns.map((turn) => <View key={turn.id} style={[styles.card, timestamp >= turn.start && timestamp < turn.end && styles.cream]}><Text style={styles.eyebrow}>{durationLabel(turn.start)} · {turn.uncertain ? "Speaker uncertain" : turn.speaker}</Text><Text style={styles.body}>{turn.text}</Text></View>) : <Empty title={conversation.state === "queued" ? "Transcript queued" : conversation.state === "processing" ? "Transcript processing" : conversation.state === "failed" ? "Transcript unavailable" : "No transcript available"} description={conversation.state === "queued" ? "The audio is queued for processing. No transcript text or speaker names are invented." : conversation.state === "processing" ? "The audio is still processing. Check back when it is ready." : conversation.state === "failed" ? "Processing did not complete. No transcript is available." : "No transcript is available for this conversation."} />}
+    {turns.length ? turns.map((turn) => <View key={turn.id} style={[styles.transcriptTurn, timestamp >= turn.start && timestamp < turn.end && styles.cream]}><Text style={styles.eyebrow}>{durationLabel(turn.start)} · {turn.uncertain ? "Unknown speaker" : turn.speaker}</Text><Text selectable style={styles.body}>{turn.text}</Text></View>) : <Empty title={conversation.state === "queued" ? "Transcript queued" : conversation.state === "processing" ? "Listening for the next words" : conversation.state === "failed" ? "Transcript unavailable" : "No speech transcribed"} description={conversation.state === "processing" ? "New dialogue appears automatically as each audio segment is processed. Silence creates no dialogue." : "Only words returned by transcription appear here. No dialogue is invented."} />}
+    {more}
     <Notice>Recorded statements are not verified events. A plan does not establish that something happened, and a speaker label is not proof of someone’s presence.</Notice>
-    {workspace.space.capabilities.includes("evidence:delete") && <Button title={busy ? "Deleting…" : "Delete conversation & linked memories"} disabled={busy || uploading || pending.length > 0 || ["recording", "starting", "saving"].includes(phase)} tone="secondary" onPress={confirmDelete} />}
+    {workspace.space.capabilities.includes("evidence:delete") && <Button title={busy ? "Deleting…" : "Delete conversation & linked memories"} disabled={busy || uploading || pendingCount > 0 || ["recording", "starting", "saving"].includes(phase)} tone="secondary" onPress={confirmDelete} />}
     <Button title="← Back" tone="secondary" onPress={back} />
   </Page>;
 }
 function LiveConversation({ id, timestamp, back }: { id: string; timestamp: number; back(): void }) {
   const { space } = useWorkspace();
-  const detail = useQuery(api.detail, { conversationId: id });
+  const detail = useQuery(api.detail, { conversationId: id, includeTurns: false });
+  const transcript = usePaginatedQuery(api.transcriptPage, { conversationId: id }, { initialNumItems: 80 });
   if (detail && detail.patientId !== space.id) return <Page eyebrow="SOURCE UNAVAILABLE" title="Choose the original patient space."><Button title="Go back" onPress={back} /></Page>;
-  return detail ? <DetailBody detail={detail} timestamp={timestamp} back={back} /> : <Loading />;
+  return detail ? <DetailBody detail={{ ...detail, turns: transcript.results }} timestamp={timestamp} back={back} more={transcript.status !== "Exhausted" && <Button title={transcript.isLoading ? "Loading dialogue…" : "Load more dialogue"} disabled={transcript.isLoading} tone="secondary" onPress={() => transcript.loadMore(80)} />} /> : <Loading />;
 }
 function ConversationContents({ id, timestamp = 0, back }: { id: string; timestamp?: number; back(): void }) {
   const { mode, space } = useWorkspace();

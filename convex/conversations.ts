@@ -5,6 +5,7 @@ import type { GenericId } from "convex/values";
 import { requireMember } from "./authz";
 import { isLocalDate } from "@hale/contracts/time";
 import { VOICE_MATCHING_POLICY } from "@hale/contracts/voice";
+import { paginationOptsValidator } from "convex/server";
 
 export async function loadSpace(ctx: QueryCtx, patientId: GenericId<"patients">, options: { day?: string; includeTurns?: boolean } = {}): Promise<{ space: PatientSpace; limited: boolean }> {
     const { patient, membership } = await requireMember(ctx, patientId, "memories:read");
@@ -18,7 +19,7 @@ export async function loadSpace(ctx: QueryCtx, patientId: GenericId<"patients">,
     const records: PatientSpace["conversations"] = [];
     for (const conversation of visible) {
       const record = conversationRecord(conversation);
-      if (options.includeTurns && conversation.state === "ready") {
+      if (options.includeTurns && (conversation.state === "ready" || conversation.state === "processing")) {
         if (budget === 0) limited = true;
         else {
           const turns = await ctx.db.query("transcriptTurns").withIndex("by_conversation", (q) => q.eq("conversationId", conversation._id)).take(Math.min(budget, 100) + 1);
@@ -100,12 +101,12 @@ export const search = query({
 });
 
 export const detail = query({
-  args: { conversationId: v.id("conversations") },
-  handler: async (ctx, { conversationId }) => {
+  args: { conversationId: v.id("conversations"), includeTurns: v.optional(v.boolean()) },
+  handler: async (ctx, { conversationId, includeTurns = true }) => {
     const conversation = await ctx.db.get(conversationId);
     if (!conversation || conversation.deletedAt) throw new ConvexError("Conversation unavailable.");
     await requireMember(ctx, conversation.patientId, "memories:read");
-    const turns = await ctx.db.query("transcriptTurns").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).take(500);
+    const turns = includeTurns ? await ctx.db.query("transcriptTurns").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).take(500) : [];
     const memories = await ctx.db.query("memories").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).take(100);
     return {
       patientId: conversation.patientId,
@@ -113,5 +114,22 @@ export const detail = query({
       memories: memories.filter((memory) => memory.patientId === conversation.patientId).map((memory) => ({ id: memory._id, kind: memory.kind, title: memory.title, text: memory.text, localDate: memory.localDate, plannedFor: memory.plannedFor, occurredAt: memory.occurredAt, conversationId: memory.conversationId, turnIds: memory.turnIds, people: memory.people })),
       turns: turns.filter((turn) => turn.patientId === conversation.patientId).map((turn) => ({ id: turn._id, speaker: turn.speaker, personId: turn.personId, start: turn.start, end: turn.end, text: turn.text, uncertain: turn.uncertain })),
     };
+  },
+});
+
+export const transcriptPage = query({
+  args: { conversationId: v.id("conversations"), paginationOpts: paginationOptsValidator },
+  returns: v.object({
+    page: v.array(v.object({ id: v.id("transcriptTurns"), speaker: v.string(), personId: v.optional(v.id("people")), start: v.number(), end: v.number(), text: v.string(), uncertain: v.boolean() })),
+    isDone: v.boolean(), continueCursor: v.string(),
+    splitCursor: v.optional(v.union(v.string(), v.null())),
+    pageStatus: v.optional(v.union(v.literal("SplitRecommended"), v.literal("SplitRequired"), v.null())),
+  }),
+  handler: async (ctx, { conversationId, paginationOpts }) => {
+    const conversation = await ctx.db.get(conversationId);
+    if (!conversation || conversation.deletedAt) throw new ConvexError("Conversation unavailable.");
+    await requireMember(ctx, conversation.patientId, "memories:read");
+    const result = await ctx.db.query("transcriptTurns").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).paginate(paginationOpts);
+    return { ...result, page: result.page.filter((turn) => turn.patientId === conversation.patientId).map(({ _id, speaker, personId, start, end, text, uncertain }) => ({ id: _id, speaker, personId, start, end, text, uncertain })) };
   },
 });

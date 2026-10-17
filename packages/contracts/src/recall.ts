@@ -7,7 +7,7 @@ const stopwords = new Set("a an the did do i we you my me our what who when wher
 export function recallEvidence(space: PatientSpace, question: string, today: string, fixedDay?: string): RecallAnswer {
   const day = resolveDayQuestion(question, today, fixedDay);
   const available = space.conversations.filter((conversation) =>
-    conversation.state === "ready" && (!day || localDate(conversation.startedAt, space.timezone) === day),
+    (conversation.state === "ready" || (conversation.state === "processing" && conversation.turns.length > 0)) && (!day || localDate(conversation.startedAt, space.timezone) === day),
   );
   const abstain: RecallAnswer = {
     text: "I don’t have enough recorded information to answer that. A missing recording doesn’t mean something didn’t happen.",

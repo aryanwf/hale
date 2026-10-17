@@ -26,6 +26,8 @@ export interface Workspace {
   selectPatient(id: string): void;
   signOut(): Promise<void>;
   beginSession(expectedPeople: string[]): Promise<string>;
+  beginContinuousSession(): Promise<string>;
+  uploadCredentials(): Promise<{ siteUrl: string; token: string }>;
   endSession(sessionId: string): Promise<void>;
   upload(recording: LocalRecording): Promise<void>;
   removeConversation(id: string): Promise<void>;
@@ -45,6 +47,8 @@ function DemoWorkspace({ children }: { children: ReactNode }) {
     patients: [{ id: space.id, name: space.name, timezone: space.timezone, capabilities: space.capabilities }],
     selectPatient: () => {}, signOut: async () => { setSpace(demoSpace); },
     beginSession: async () => `demo-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    beginContinuousSession: async () => { throw new Error("Live recording is unavailable in demo mode."); },
+    uploadCredentials: async () => { throw new Error("Demo audio is never uploaded."); },
     endSession: async () => {},
     upload: async () => { throw new Error("Demo audio stays on this device. Configure live mode to upload."); },
     removeConversation: async (id) => setSpace((current) => ({ ...current, conversations: current.conversations.filter((item) => item.id !== id), memories: current.memories.filter((item) => item.conversationId !== id) })),
@@ -65,6 +69,13 @@ function PatientWorkspace({ patientId, patients, selectPatient, children }: { pa
     mode: "live", owner: userId, space, patients, selectPatient, today,
     signOut: async () => { await signOut(); },
     beginSession: (expectedPeople) => begin({ patientId, participantsConsented: true, captureMode: "native", expectedPeople }),
+    beginContinuousSession: () => begin({ patientId, participantsConsented: true, captureMode: "native", continuous: true }),
+    uploadCredentials: async () => {
+      const token = await getToken({ template: "convex" });
+      if (!token) throw new Error("Please sign in again.");
+      if (!config.siteUrl) throw new Error("Uploads aren’t available right now.");
+      return { token, siteUrl: config.siteUrl };
+    },
     endSession: (sessionId) => state({ sessionId, state: "stopped" }).then(() => {}),
     upload: async (recording) => {
       if (recording.owner !== userId || recording.patientId !== patientId) throw new Error("This recording belongs to a different account or patient space.");

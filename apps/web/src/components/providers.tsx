@@ -79,14 +79,12 @@ function LiveGate({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth();
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
   const patients = useQuery(api.patients, isAuthenticated ? {} : "skip");
-  const family = useQuery(api.voiceProfile, isAuthenticated ? {} : "skip");
   const [selected, setSelected] = useState<string>();
   if (!isLoaded) return <Gate title="A moment for your memories…" />;
   if (!isSignedIn) return <Gate title="Your memories. Your space." description="Sign in to open your private memory bank. Only people you authorize can access it."><div className="button-group"><Link href="/login" className="btn btn-primary">Log in <ArrowRight size={17} /></Link><Link href="/signup" className="btn btn-quiet">Create an account</Link></div></Gate>;
   if (authLoading) return <Gate title="Connecting securely…" />;
   if (!isAuthenticated) return <Gate title="Your memory connection needs attention." description="Your account is signed in, but Convex could not authenticate it. Check the Clerk convex JWT template and deployment issuer configuration."><UserButton /></Gate>;
-  if (!patients || !family) return <Gate title="Finding your memory space…" />;
-  if (!patients.length && family.profile) return <Gate title="You’re part of the circle." description="Your family account is ready. A patient-space administrator still needs to give your account access. Creating an account or a voice profile never grants access to someone’s memories. Invitation management isn’t connected in this prototype."><div className="button-group"><Link href="/signup/voice" className="btn btn-primary">Manage my voice profile <ArrowRight size={17} /></Link><UserButton /></div></Gate>;
+  if (!patients) return <Gate title="Finding your memory space…" />;
   if (!patients.length) return <Onboarding />;
   const patientId = patients.find((patient) => patient.id === selected)?.id ?? patients[0].id;
   return <LiveSpace key={patientId} patientId={patientId} patients={patients} selectPatient={setSelected}>{children}</LiveSpace>;

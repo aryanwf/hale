@@ -65,6 +65,14 @@ describe("family account and voice enrollment boundaries", () => {
     expect(await t.run((ctx) => ctx.db.query("patients").collect())).toEqual([]);
     await expect(family.mutation(app.api.voices.saveProfile, { name: " ", relationship: "Friend" })).rejects.toThrow("name");
   });
+  test("a family profile can create its own space without gaining access to other spaces", async () => {
+    const { t, family } = await setup();
+    await t.withIdentity({ subject: "another-patient" }).mutation(app.api.patients.create, { name: "Another Patient", timezone: "UTC", recordingConsent: true });
+    await family.mutation(app.api.voices.skip);
+    const patientId = await family.mutation(app.api.patients.create, { name: "My Space", timezone: "UTC", recordingConsent: true });
+    const spaces = await family.query(app.api.patients.list);
+    expect(spaces.map((space) => space.id)).toEqual([patientId]);
+  });
   test("skipping needs no biometric consent and collects no voiceprint", async () => {
     const { t, family } = await setup();
     await family.mutation(app.api.voices.skip);

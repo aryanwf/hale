@@ -56,6 +56,21 @@ http.route({
   }),
 });
 
+http.route({
+  path: "/recording-stop", method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const headers = { "Cache-Control": "no-store" };
+    if (request.headers.has("origin")) return new Response("Native endpoint only.", { status: 403, headers });
+    if (!await ctx.auth.getUserIdentity()) return new Response("Sign in required.", { status: 401, headers });
+    try {
+      const body: unknown = await request.json();
+      if (!body || typeof body !== "object" || !("sessionId" in body) || typeof body.sessionId !== "string") return new Response("Invalid session.", { status: 400, headers });
+      await ctx.runMutation(makeFunctionReference<"mutation">("recordings:setState"), { sessionId: body.sessionId, state: "stopped" });
+      return Response.json({ stopped: true }, { headers });
+    } catch { return new Response("Session could not be stopped.", { status: 400, headers }); }
+  }),
+});
+
 http.route({ path: "/voice", method: "OPTIONS", handler: httpAction(async (_ctx, request) =>
   new Response(null, { status: 204, headers: cors(request.headers.get("origin")) }),
 ) });

@@ -12,22 +12,8 @@
 
 .intro { min-width: 0; }
 
-.eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: .075em;
-  line-height: 1.5;
-  text-transform: uppercase;
-}
-
 .intro h1 {
   max-width: 24ch;
-  margin-top: 12px;
   font-family: var(--font-sans);
   font-size: clamp(30px, 3.1vw, 40px);
   font-weight: 500;
@@ -37,14 +23,6 @@
 }
 
 .intro h1 span { color: var(--muted); font-weight: 400; }
-
-.description {
-  max-width: 58ch;
-  margin-top: 11px;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.75;
-}
 
 .overview {
   display: flex;
@@ -86,17 +64,7 @@
   gap: 20px;
 }
 
-.sectionEyebrow {
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: .07em;
-  line-height: 1.5;
-  text-transform: uppercase;
-}
-
 .archiveHeading h2 {
-  margin-top: 4px;
   font-size: 21px;
   font-weight: 500;
   letter-spacing: -.04em;
@@ -260,22 +228,6 @@
 .emptyLink { display: inline-flex; min-height: 38px; align-items: center; gap: 7px; margin-top: 11px; padding: 0 12px; border: 1px solid var(--rule); border-radius: 999px; color: var(--accent); font-size: 11px; font-weight: 500; }
 .emptyLink:hover { background: var(--blush); }
 
-.privacyNote {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-top: 18px;
-  padding: 12px 14px;
-  border-radius: 7px;
-  background: var(--shade);
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.privacyNote > svg { color: var(--accent); }
-.privacyNote p { flex: 1; line-height: 1.6; }
-.privacyNote > span { padding-left: 12px; border-left: 1px solid var(--rule-strong); color: var(--accent); font-size: 9px; white-space: nowrap; }
-
 @media (max-width: 900px) {
   .pageHeader { grid-template-columns: 1fr; gap: 20px; padding-top: 36px; }
   .overview { width: fit-content; }
@@ -284,7 +236,6 @@
 @media (max-width: 680px) {
   .pageHeader { gap: 18px; padding: 30px 0 25px; }
   .intro h1 { max-width: 20ch; font-size: 32px; }
-  .description { font-size: 12px; }
   .overview { width: 100%; min-width: 0; padding: 13px; }
   .overviewStat { flex: 1; }
   .overviewPeople { min-width: 78px; }
@@ -309,8 +260,6 @@
   .status { width: 16px; height: 20px; justify-content: center; overflow: hidden; font-size: 0; }
   .status svg { width: 15px; height: 15px; }
   .chevron { width: 15px; }
-  .privacyNote { align-items: flex-start; flex-wrap: wrap; }
-  .privacyNote > span { margin-left: 25px; padding-left: 0; border: 0; }
 }
 
 @media (max-width: 420px) {
@@ -326,7 +275,6 @@
   .cardAside { grid-column: 2; grid-row: 2; }
   .status { display: none; }
   .emptyState { padding: 30px 16px; }
-  .privacyNote { font-size: 9px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

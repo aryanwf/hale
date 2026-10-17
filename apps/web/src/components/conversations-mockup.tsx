@@ -12,10 +12,8 @@ import {
   CircleCheck,
   Clock3,
   Hourglass,
-  Leaf,
   MessageSquareText,
   Search,
-  ShieldCheck,
   X,
 } from "lucide-react";
 import type { Conversation, Person } from "@hale/contracts";
@@ -50,9 +48,7 @@ export function ConversationsMockupView() {
     <div className={styles.conversationsMockup}>
       <header className={styles.pageHeader}>
         <div className={styles.intro}>
-          <p className={styles.eyebrow}><Leaf size={15} /> The words behind your memories</p>
           <h1>Conversations, <span>made easy to find.</span></h1>
-          <p className={styles.description}>Return to the people, plans, and little moments you’ve recorded.</p>
         </div>
 
         <div className={styles.overview} role="group" aria-label="Conversation archive overview">
@@ -72,7 +68,6 @@ export function ConversationsMockupView() {
       <section className={styles.archive} aria-labelledby="archive-heading">
         <div className={styles.archiveHeading}>
           <div>
-            <p className={styles.sectionEyebrow}>Browse your archive</p>
             <h2 id="archive-heading">Recorded conversations</h2>
           </div>
           {hasFilters && <button className={styles.clearButton} type="button" onClick={clearFilters}><X size={14} />Clear filters</button>}
@@ -135,11 +130,6 @@ export function ConversationsMockupView() {
         )}
       </section>
 
-      <aside className={styles.privacyNote}>
-        <ShieldCheck size={17} />
-        <p>Search your recorded words. A missing recording doesn’t mean a moment didn’t happen.</p>
-        <span>Private to your space</span>
-      </aside>
     </div>
   );
 }

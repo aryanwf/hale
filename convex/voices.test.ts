@@ -197,6 +197,7 @@ describe("pyannoteAI adapter (mocked HTTP, no live calls)", () => {
     await t.action(workers.internal.voices.start, { profileId, requestId });
     const profile = await t.run((ctx) => ctx.db.get(profileId));
     expect(profile?.voiceState).toBe("failed"); expect(profile?.message).not.toContain("private-provider");
+    expect(profile?.message).toContain("subscription or credits");
     expect(await t.run((ctx) => ctx.storage.getUrl(storageId))).toBeNull();
   });
   test("provider warnings do not block a valid voiceprint, while provider errors and exhausted polling fail safely", async () => {

@@ -81,14 +81,13 @@ export function Overview() {
                 href={`/family/calendar?date=${date}`}
                 className={`overview-calendar-day${date.slice(0, 7) !== today.slice(0, 7) ? " outside-month" : ""}${date === today ? " today-day" : ""}`}
                 aria-current={date === today ? "date" : undefined}
-                aria-label={`${dateLabel(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}${hasRecordings ? ", has recordings" : ", no recordings"}`}
+                aria-label={`${dateLabel(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}${hasRecordings ? ", recordings available" : ""}`}
               >
                 <span>{Number(date.slice(-2))}</span>
                 {hasRecordings && <i aria-hidden="true" />}
               </Link>;
             })}
           </div>
-          <p className="overview-calendar-legend"><i aria-hidden="true" />Days with recordings</p>
         </div>
       </section>
 

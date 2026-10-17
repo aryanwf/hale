@@ -45,7 +45,7 @@ export function MemoriesScreen({ open, ask }: { open: OpenConversation; ask(day?
         {["S", "M", "T", "W", "T", "F", "S"].map((label, index) => <Text key={`${label}-${index}`} style={styles.calendarWeekday}>{label}</Text>)}
         {calendarDays(day).map((date, index) => {
           const selected = date === day && !allDays;
-          return <Pressable key={date ?? `blank-${index}`} accessibilityRole="button" accessibilityLabel={date ? `${dateLabel(date)}${recordedDays.has(date) ? ", has recordings" : ", no recordings"}` : "Empty calendar cell"} accessibilityState={{ selected, disabled: !date }} disabled={!date} onPress={() => { if (date) { setDay(date); setAllDays(false); } }} style={[styles.calendarCell, selected && styles.calendarCellSelected]}>
+          return <Pressable key={date ?? `blank-${index}`} accessibilityRole="button" accessibilityLabel={date ? `${dateLabel(date)}${recordedDays.has(date) ? ", recordings available" : ""}` : "Empty calendar cell"} accessibilityState={{ selected, disabled: !date }} disabled={!date} onPress={() => { if (date) { setDay(date); setAllDays(false); } }} style={[styles.calendarCell, selected && styles.calendarCellSelected]}>
             <Text style={[styles.small, selected && styles.calendarSelectedText]}>{date ? Number(date.slice(-2)) : ""}</Text>
             {date && recordedDays.has(date) && <View style={[styles.calendarDot, selected && styles.calendarDotSelected]} />}
           </Pressable>;
@@ -53,20 +53,18 @@ export function MemoriesScreen({ open, ask }: { open: OpenConversation; ask(day?
       </View>
       <Text style={styles.small}>{allDays ? "All available dates" : dateLabel(day, { weekday: "long", month: "long", day: "numeric" })}</Text>
       <View style={styles.row}>
-        <View style={styles.grow}><Button title="Today" tone="secondary" onPress={() => { setDay(today); setAllDays(false); }} /></View>
         <View style={styles.grow}><Button title={allDays ? "Selected day" : "All dates"} tone="secondary" onPress={() => setAllDays(!allDays)} /></View>
       </View>
       <Button title={allDays ? "Ask about all dates" : "Ask about this day"} onPress={() => ask(allDays ? undefined : day)} />
     </View>
 
     <Text style={styles.heading}>Saved memories</Text>
-    {visible.length ? visible.map((memory) => <MemoryCard key={memory.id} memory={memory} open={open} />) : <Empty title="No saved memories" description="There are no matching memories for this date or search. That doesn’t mean nothing happened." />}
+    {visible.length ? visible.map((memory) => <MemoryCard key={memory.id} memory={memory} open={open} />) : <Empty title="No saved memories" description="No saved memories match this date or search." />}
     <Text style={styles.heading}>Conversations</Text>
     {!!error && <Notice>{error}</Notice>}
     {!error && !results && <Text accessibilityLiveRegion="polite" style={styles.small}>Searching…</Text>}
     {results?.conversations.map((item) => <View key={item.id} style={styles.stack}><Text style={styles.eyebrow}>{dateLabel(localDate(item.startedAt, space.timezone))}</Text><ConversationCard conversation={item} open={open} /></View>)}
     {results && !results.conversations.length && <Empty title="No matching conversations" description="Try another search or date." />}
     {results?.limited && <Notice>Showing a limited set of results. Choose a date or add a search word to narrow them.</Notice>}
-    <Notice>Dates use {space.timezone}. Plans are not confirmed events, and missing recordings do not prove something did not happen.</Notice>
   </Page>;
 }

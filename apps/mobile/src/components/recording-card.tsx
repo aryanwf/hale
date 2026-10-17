@@ -1,37 +1,63 @@
-import { useState } from "react";
-import { Alert, Text, View } from "react-native";
+import { Alert, Pressable, Switch, Text, View } from "react-native";
+import { useQuery } from "convex/react";
+import { Mic, MicOff, ArrowRight } from "lucide-react-native";
+import { api } from "@hale/contracts/api";
 import { durationLabel } from "@hale/contracts/time";
 import { useCapture } from "../providers/capture";
 import { useWorkspace } from "../providers/workspace";
-import { styles } from "../theme";
-import { Button, Check } from "./ui";
+import { colors, styles } from "../theme";
+import { Button } from "./ui";
+import type { OpenConversation } from "./evidence";
 
-export function RecordingCard() {
+function LiveDialogue({ sessionId, open }: { sessionId: string; open?: OpenConversation }) {
+  const live = useQuery(api.liveTranscript, { sessionId });
+  if (!live) return <Text style={styles.small}>Your first words will appear here after the first segment is processed.</Text>;
+  return <View style={styles.stack}>
+    <View style={styles.between}><Text style={styles.eyebrow}>LATEST DIALOGUE</Text><Text style={styles.small}>{live.pending ? `${live.pending} processing` : "Latest saved"}</Text></View>
+    {live.turns.slice(-3).map((turn) => <View key={turn.id} style={styles.transcriptTurn}>
+      <Text style={styles.eyebrow}>{durationLabel(turn.start)} · {turn.uncertain ? "Unknown speaker" : turn.speaker}</Text>
+      <Text selectable style={styles.body}>{turn.text}</Text>
+    </View>)}
+    {!live.turns.length && <Text style={styles.small}>Listening for speech. Silence won’t create dialogue.</Text>}
+    {!!live.failed && <Text style={[styles.small, { color: colors.rescue }]}>{live.failed} segment(s) could not be transcribed. Some words may be missing.</Text>}
+    {live.conversationId && open && <Pressable accessibilityRole="button" onPress={() => open(live.conversationId!)} style={[styles.row, { minHeight: 44 }]}><Text style={[styles.textLink, styles.grow]}>Open recorded conversation</Text><ArrowRight size={17} color={colors.burgundy} /></Pressable>}
+  </View>;
+}
+
+export function RecordingCard({ open, compact = false }: { open?: OpenConversation; compact?: boolean }) {
   const { space, mode } = useWorkspace();
-  const { controller, phase, hasActiveRecording, seconds, pending, uploading, message } = useCapture();
-  const [consent, setConsent] = useState(false);
-  const [expectedPeople, setExpectedPeople] = useState<string[]>([]);
-  const matchablePeople = space.people.filter((person) => person.voiceMatchingAvailable);
-  const recording = phase === "recording";
-  const busy = phase === "starting" || phase === "saving" || uploading;
-  if (!space.capabilities.includes("recordings:create")) return <View style={styles.card}><Text style={styles.small}>Recording unavailable for this space.</Text></View>;
-  return <View style={[styles.card, styles.blush]}>
-    <View style={styles.between}><Text style={styles.eyebrow}>{recording ? "RECORDING" : "RECORD A CONVERSATION"}</Text><Text style={styles.mono}>{durationLabel(seconds)}</Text></View>
-    <Text style={styles.heading}>{recording ? "Recording in progress" : phase === "paused" ? "Recording paused" : "Transcribe a conversation"}</Text>
-    <Text style={styles.small}>{recording ? "Capture continues with the screen locked. Pause or stop whenever you like." : "Audio is temporary processing input. Hale keeps the transcript, not a playable recording."}</Text>
-    {!recording && !busy && <Check checked={consent} onChange={() => setConsent(!consent)}>Everyone taking part agrees to be recorded, including while Hale is in the background.</Check>}
-    {!recording && !busy && matchablePeople.map((person) => <Check key={person.id} checked={expectedPeople.includes(person.id)} onChange={() => setExpectedPeople((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : [...current, person.id])}>Expect {person.name} · {person.relationship} to be here</Check>)}
-    {!recording && !busy && !matchablePeople.length && <Text style={styles.small}>No linked person currently has an enrolled voice profile and active matching consent. Speakers will remain unknown.</Text>}
-    {recording ? <View style={styles.row}><View style={styles.grow}><Button title="Pause" tone="secondary" onPress={() => void controller.pause()} /></View><View style={styles.grow}><Button title="Stop recording" onPress={() => void controller.stop()} /></View></View> : <Button title={phase === "starting" ? "Opening microphone…" : phase === "saving" ? "Finalizing audio…" : phase === "paused" ? "Resume in a new segment" : "Start a conversation"} disabled={!consent || busy} onPress={() => void controller.start(consent, expectedPeople)} />}
-    {phase === "interrupted" && <Button title="Finish recording / retry stop" tone="secondary" onPress={() => void controller.stop()} />}
-    {!!message && <Text accessibilityLiveRegion="polite" style={styles.small}>{message}</Text>}
-    <Text style={styles.small}>Recordings stop after 1 hour. Pausing starts a new segment. Calls, force-stop, or device restrictions may interrupt capture. Hale will not restart automatically.</Text>
-    {mode === "demo" && <Text style={styles.small}>Demo audio stays on this device. It is never uploaded or transcribed.</Text>}
-    {pending.length > 0 && <View style={styles.stack}>
-      <View style={styles.divider} /><Text style={styles.eyebrow}>{pending.length} TEMPORARY LOCAL CLIP{pending.length === 1 ? "" : "S"}</Text>
-      {pending.map((item, index) => <View key={item.id} style={styles.stack}><Text style={styles.small}>Segment {index + 1} · {durationLabel(item.durationMs / 1000)}</Text><Button title={`Discard temporary clip ${index + 1}`} tone="secondary" disabled={hasActiveRecording || busy} onPress={() => Alert.alert("Discard this temporary audio?", "This cannot be undone. Previously uploaded transcript text is not deleted here.", [{ text: "Keep it", style: "cancel" }, { text: "Discard", style: "destructive", onPress: () => controller.discard(item.id) }])} /></View>)}
-      {mode === "live" && <Button title={uploading ? "Uploading for transcription…" : "Upload for transcription / retry"} disabled={recording || busy} onPress={() => void controller.retry()} />}
-      <Text style={styles.small}>A temporary local copy is kept only until upload succeeds or you discard it, so an interrupted connection can be retried. Hale deletes its server copy after transcription and any selected speaker matching; Android app backup is disabled.</Text>
+  const { controller, phase, hasActiveRecording, seconds, pendingCount, uploading, message, sessionId, available, needsFinalization, blockedByAnotherSpace } = useCapture();
+  const busy = phase === "starting" || phase === "saving";
+  if (!space.capabilities.includes("recordings:create")) return null;
+  if (compact && !hasActiveRecording && !pendingCount && !needsFinalization) return null;
+  const Icon = hasActiveRecording ? Mic : MicOff;
+  function toggle(on: boolean) {
+    if (!on) { void controller.stop(); return; }
+    Alert.alert("Switch recording on?", "Everyone present must agree to ongoing recording, including while your screen is locked. Audio is sent to Sarvam about every 10 seconds; this uses battery, mobile data, and API quota. Speech becomes part of this patient space’s recorded conversation. Switch off here or in the Android notification at any time.", [
+      { text: "Not now", style: "cancel" },
+      { text: "Everyone agrees · switch on", onPress: () => void controller.start(true) },
+    ]);
+  }
+  return <View style={[styles.card, styles.liveCard, hasActiveRecording && styles.liveCardActive]}>
+    <View style={styles.between}>
+      <View style={[styles.row, styles.grow]}>
+        <View style={[styles.recordIcon, hasActiveRecording && { backgroundColor: colors.rescueMist }]}><Icon size={22} strokeWidth={1.7} color={hasActiveRecording ? colors.rescue : colors.burgundy} /></View>
+        <View style={styles.grow}><Text style={styles.title}>{busy ? phase === "starting" ? "Opening microphone…" : "Switching off…" : hasActiveRecording ? "Recording is on" : "Live recording"}</Text><Text style={styles.small}>{hasActiveRecording ? "Listening, even with your screen locked" : "Your microphone is off"}</Text></View>
+      </View>
+      <Switch accessibilityLabel="Continuous conversation recording" accessibilityHint="Switch on only with everyone’s consent. Switch off to stop the microphone." value={hasActiveRecording} disabled={busy || !available || (!hasActiveRecording && (blockedByAnotherSpace || needsFinalization || pendingCount > 0))} trackColor={{ false: colors.strongBorder, true: colors.burgundy }} thumbColor={colors.white} onValueChange={toggle} />
+    </View>
+    {!compact && <Text style={styles.small}>{hasActiveRecording ? "Keep living your day. New dialogue is appended to one conversation as each ten-second segment is processed." : "One switch. One ongoing conversation. Words appear here as you speak, with a short processing delay."}</Text>}
+    {(hasActiveRecording || sessionId) && <View style={styles.recordMeta}>
+      <View style={styles.between}><View style={styles.row}>{hasActiveRecording && <View style={styles.statusDot} />}<Text style={styles.eyebrow}>{hasActiveRecording ? "LIVE TRANSCRIPTION" : needsFinalization ? "FINISHING UP" : "MICROPHONE OFF"}</Text></View><Text style={[styles.mono, { color: hasActiveRecording ? colors.rescue : colors.muted }]}>{durationLabel(seconds)}</Text></View>
+      {!compact && mode === "live" && sessionId && <LiveDialogue sessionId={sessionId} open={open} />}
     </View>}
+    {!!message && <Text accessibilityLiveRegion="polite" style={styles.small}>{message}</Text>}
+    {!available && <Text style={styles.small}>{mode === "demo" ? "Live recording is only available in a signed-in live space. Demo mode never sends audio." : "This build needs the new native recording service. Rebuild and install Hale for Android to enable the switch."}</Text>}
+    {pendingCount > 0 && <View style={styles.recordMeta}>
+      <Text style={styles.small}>{pendingCount} unsent segment{pendingCount === 1 ? "" : "s"} · {uploading ? "uploading" : "saved on this device"}. Retried automatically; recording stops if the five-minute offline queue fills.</Text>
+      <Button title="Reconnect / retry uploads" tone="secondary" onPress={() => void controller.retry()} />
+      {!hasActiveRecording && <Button title="Discard unsent audio" tone="secondary" disabled={uploading || busy} onPress={() => Alert.alert("Discard unsent audio?", "Words in these unsent segments cannot be recovered. Already uploaded dialogue stays in the recorded conversation.", [{ text: "Keep audio", style: "cancel" }, { text: "Discard", style: "destructive", onPress: () => void controller.discard() }])} />}
+    </View>}
+    {!compact && <Text style={[styles.small, { fontSize: 11, lineHeight: 18 }]}>Only record with everyone’s consent. Live speaker identities are not verified. Temporary audio is deleted after processing; saved words remain until you delete the conversation. Interruptions may leave gaps.</Text>}
   </View>;
 }

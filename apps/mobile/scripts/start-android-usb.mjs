@@ -60,7 +60,8 @@ if (reverse.error || reverse.status !== 0) {
   process.exit(1);
 }
 
-const metro = spawnSync(process.execPath, [require.resolve("expo/bin/cli"), "start", "--dev-client", "--localhost", "--port", String(metroPort), "--android"], {
+// ADB reverse connects to IPv4 loopback; Windows may resolve localhost to ::1.
+const metro = spawnSync(process.execPath, ["--dns-result-order=ipv4first", require.resolve("expo/bin/cli"), "start", "--dev-client", "--localhost", "--port", String(metroPort), "--android"], {
   cwd: appDirectory,
   stdio: "inherit",
 });

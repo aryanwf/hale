@@ -23,8 +23,8 @@ export function Page({ eyebrow, title, description, children }: { eyebrow: strin
 export function Notice({ children }: { children: ReactNode }) {
   return <View style={[styles.card, styles.quiet]}><Text style={styles.small}>{children}</Text></View>;
 }
-export function Empty({ title, description }: { title: string; description: string }) {
-  return <View style={styles.card}><Text style={styles.heading}>{title}</Text><Text style={styles.small}>{description}</Text></View>;
+export function Empty({ title, description }: { title: string; description?: string }) {
+  return <View style={styles.card}><Text style={styles.heading}>{title}</Text>{description && <Text style={styles.small}>{description}</Text>}</View>;
 }
 export function Loading({ message = "A moment for your memories…" }: { message?: string }) {
   return <View style={[styles.screen, { justifyContent: "center", padding: 32, gap: 20 }]}><ActivityIndicator color={colors.burgundy} /><Text style={[styles.body, { textAlign: "center" }]}>{message}</Text></View>;

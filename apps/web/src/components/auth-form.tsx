@@ -50,7 +50,7 @@ function LiveAuth({ signup }: { signup: boolean }) {
         <h2>You’re signed in.</h2>
         <p className="muted">{nextStep}</p>
         <Link className="btn btn-primary" href={destination}>
-          {signup ? "Continue" : "Open my space"}
+          {signup ? "Continue setup" : "Open my space"}
           <ArrowRight size={17} />
         </Link>
       </div>

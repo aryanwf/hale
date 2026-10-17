@@ -1,0 +1,254 @@
+.careMockup {
+  --care-card: #fff;
+  padding-bottom: 12px;
+}
+
+.intro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 36px;
+  padding: 42px 0 32px;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .065em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.intro h1 {
+  margin-top: 10px;
+  font-family: var(--font-sans);
+  font-size: clamp(30px, 3.3vw, 39px);
+  font-weight: 500;
+  letter-spacing: -.055em;
+  line-height: 1.2;
+}
+
+.intro h1 span { color: var(--muted); font-weight: 400; }
+
+.introCopy {
+  max-width: 390px;
+  padding-bottom: 3px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.sectionNav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 20px 0 24px;
+  border-top: 1px solid var(--rule);
+}
+
+.sectionButton {
+  display: flex;
+  min-width: 0;
+  min-height: 76px;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 16px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  transition: background var(--fast) ease, border-color var(--fast) ease, transform var(--fast) ease;
+}
+
+.sectionButton:hover { background: #F6F1EE; border-color: var(--rule-strong); }
+.sectionButton:active { transform: scale(.99); }
+.sectionButton[aria-pressed="true"] { background: var(--shade); border-color: var(--rule-strong); }
+
+.sectionIcon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--care-card);
+  color: var(--accent);
+}
+
+.sectionCopy { display: grid; min-width: 0; gap: 2px; }
+.sectionLabel { overflow: hidden; font-size: 14px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.sectionDetail { color: var(--muted); font-size: 11px; }
+.sectionArrow { margin-left: auto; color: var(--muted); transition: transform var(--medium) var(--ease-out), color var(--fast) ease; }
+.sectionButton:hover .sectionArrow, .sectionButton[aria-pressed="true"] .sectionArrow { color: var(--accent); transform: translateX(2px); }
+
+.panel {
+  min-width: 0;
+  padding: 25px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--care-card);
+}
+
+.panelHeading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.featureIcon, .connectionIcon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blush);
+  color: var(--accent);
+}
+
+.headingCopy { display: grid; min-width: 0; gap: 3px; }
+.headingCopy h2 { font-size: 21px; font-weight: 500; letter-spacing: -.035em; line-height: 1.35; }
+.headingCopy > span { color: var(--muted); font-size: 12px; }
+.status { margin-left: auto; padding: 5px 10px; border: 1px solid var(--rule); border-radius: 999px; background: var(--ground); color: var(--muted); font-size: 11px; white-space: nowrap; }
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin: 0 0 18px;
+  padding: 12px 15px;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  background: var(--ground);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.notice > svg { margin-top: 2px; color: var(--accent); }
+.notice p { max-width: 82ch; }
+
+.routeCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 15px;
+  margin: 0 0 16px;
+  padding: 19px 20px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+
+.routeStop { display: flex; min-width: 0; align-items: center; gap: 12px; }
+.routeStop > span:last-child { display: grid; min-width: 0; gap: 4px; }
+.routeLabel { color: var(--muted); font-family: var(--font-mono); font-size: 10px; letter-spacing: .055em; text-transform: uppercase; }
+.routeStop strong { overflow: hidden; font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.routeMarker { width: 10px; height: 10px; flex: 0 0 auto; border: 2px solid var(--accent); border-radius: 50%; }
+.routeMarkerEnd { border-radius: 2px; }
+.routeLine { width: 100%; border-top: 1px dashed var(--rule-strong); }
+.previewButton { min-height: 43px; }
+
+.rideOptions { margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--rule); }
+.rideOptions > p:first-child { margin-bottom: 5px; }
+.rideOption { display: flex; align-items: center; gap: 13px; padding: 15px 0; border-bottom: 1px solid var(--rule); }
+.rideOptionIcon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; background: var(--shade); color: var(--accent); }
+.rideOptionCopy { display: grid; flex: 1; gap: 2px; }
+.rideOptionCopy > strong { font-size: 14px; font-weight: 500; }
+.rideOptionCopy > span { color: var(--muted); font-size: 11px; }
+.price { font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.rideDisclaimer { margin: 14px 0 16px; }
+.handoff { display: flex; align-items: center; gap: 7px; margin-top: 12px; color: var(--accent); font-size: 12px; }
+
+.connectionState {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 21px;
+  border: 1px dashed var(--rule-strong);
+  border-radius: 8px;
+  background: var(--ground);
+}
+
+.connectionIcon { width: 42px; height: 42px; background: var(--shade); }
+.connectionState > div { min-width: 0; padding-top: 1px; }
+.connectionState h3 { font-size: 16px; font-weight: 500; letter-spacing: -.02em; line-height: 1.4; }
+.connectionState p { max-width: 72ch; margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.connectionAction { margin-top: 14px; }
+
+.privacyNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 12px 15px;
+  border-radius: 7px;
+  background: var(--shade);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.privacyNote > svg { margin-top: 1px; color: var(--accent); }
+
+.medicationCard { padding: 21px; border: 1px solid var(--rule); border-radius: 8px; }
+.medicationTop { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.medicationTop h3 { margin-top: 7px; font-size: 18px; font-weight: 500; letter-spacing: -.03em; }
+.timeBadge { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; padding: 7px 10px; border-radius: 999px; background: var(--shade); color: var(--muted); font-size: 11px; }
+.timeBadge svg { color: var(--accent); }
+.instruction { margin-top: 9px; color: var(--muted); font-size: 13px; }
+.medicationReport { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0; padding: 13px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); color: var(--muted); font-size: 12px; line-height: 1.7; }
+.reportDot { width: 8px; height: 8px; flex: 0 0 auto; margin-top: 6px; border: 1px solid var(--rule-strong); border-radius: 50%; }
+.reportPrompt { margin-bottom: 9px; font-size: 12px; font-weight: 500; }
+.reportButtons { flex-wrap: wrap; }
+.medicationFootnote { margin-top: 13px; max-width: 100ch; }
+
+.confirmDialog { border-radius: 12px; }
+
+@media (max-width: 760px) {
+  .intro { align-items: flex-start; flex-direction: column; gap: 12px; padding-top: 33px; }
+  .introCopy { max-width: 560px; }
+  .sectionNav { gap: 8px; }
+  .sectionButton { gap: 10px; padding: 12px; }
+  .sectionIcon { width: 36px; height: 36px; }
+  .sectionLabel { font-size: 12px; }
+  .sectionDetail { font-size: 10px; }
+}
+
+@media (max-width: 560px) {
+  .intro { padding: 30px 0 24px; }
+  .intro h1 { font-size: 30px; }
+  .introCopy { font-size: 13px; }
+  .sectionNav { grid-template-columns: 1fr; gap: 7px; padding: 16px 0; }
+  .sectionButton { min-height: 58px; }
+  .sectionIcon { width: 34px; height: 34px; }
+  .sectionLabel { font-size: 13px; }
+  .sectionDetail { font-size: 10px; }
+  .panel { padding: 17px; border-radius: 8px; }
+  .panelHeading { flex-wrap: wrap; gap: 11px; margin-bottom: 17px; }
+  .featureIcon { width: 42px; height: 42px; }
+  .headingCopy { flex: 1; }
+  .headingCopy h2 { font-size: 18px; }
+  .headingCopy > span { font-size: 11px; }
+  .status { margin-left: 53px; }
+  .routeCard { grid-template-columns: 1fr; gap: 10px; padding: 15px; }
+  .routeLine { width: 1px; height: 13px; margin-left: 4px; border-top: 0; border-left: 1px dashed var(--rule-strong); }
+  .routeStop strong { font-size: 12px; }
+  .connectionState { gap: 12px; padding: 16px; }
+  .connectionIcon { width: 36px; height: 36px; }
+  .connectionState h3 { font-size: 15px; }
+  .medicationCard { padding: 16px; }
+  .medicationTop { flex-direction: column; gap: 11px; }
+  .reportButtons { display: grid; grid-template-columns: 1fr; }
+  .reportButtons .btn { width: 100%; }
+  .rideOptions > a { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sectionButton, .sectionArrow { transition: none; }
+}

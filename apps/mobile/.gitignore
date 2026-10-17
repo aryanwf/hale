@@ -11,3 +11,5 @@ web-build/
 .env
 *.swp
 *.swo
+
+.env.local

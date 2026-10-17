@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { Conversation } from "@hale/contracts";
-import { dateLabel, localDate, shiftDate } from "@hale/contracts/time";
+import { dateLabel, localDate } from "@hale/contracts/time";
 import { ConversationCard, MemoryCard, type OpenConversation } from "../components/evidence";
 import { Button, Empty, Field, Notice, Page } from "../components/ui";
 import { useWorkspace } from "../providers/workspace";

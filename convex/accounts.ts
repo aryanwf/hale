@@ -1,11 +1,12 @@
 import { ConvexError, v, type GenericId } from "convex/values";
-import { hashIdentity, requireIdentity } from "./authz";
-import { internalMutation, mutation, type MutationCtx } from "./lib/functions";
+import { getAccountStatus, hashIdentity, requireIdentity } from "./authz";
+import { internalMutation, mutation, query, type MutationCtx } from "./lib/functions";
 import type { Doc, TableNames } from "./_generated/dataModel";
 
 const MAX_ACCOUNT_DOCUMENTS = 1_000;
 const READ_LIMIT = MAX_ACCOUNT_DOCUMENTS + 1;
 const resultValidator = v.object({ deletedDocuments: v.number(), deletedFiles: v.number() });
+const accountStatusValidator = v.union(v.literal("signedOut"), v.literal("active"), v.literal("deleted"));
 
 type DeletionDocument = { _id: GenericId<TableNames>; storageId?: GenericId<"_storage"> };
 
@@ -91,6 +92,12 @@ async function eraseAccountData(ctx: MutationCtx, subject: string) {
   for (const document of documents.values()) await ctx.db.delete(document._id);
   return { deletedDocuments: documents.size, deletedFiles: files.size };
 }
+
+export const status = query({
+  args: {},
+  returns: accountStatusValidator,
+  handler: async (ctx) => (await getAccountStatus(ctx)).status,
+});
 
 export const deleteMyData = mutation({
   args: { confirmation: v.literal("DELETE") },

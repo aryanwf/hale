@@ -4,6 +4,7 @@ import { query, type QueryCtx, type DataModel } from "./lib/functions";
 import type { GenericId } from "convex/values";
 import { requireMember } from "./authz";
 import { isLocalDate } from "@hale/contracts/time";
+import { VOICE_MATCHING_POLICY } from "@hale/contracts/voice";
 
 export async function loadSpace(ctx: QueryCtx, patientId: GenericId<"patients">, options: { day?: string; includeTurns?: boolean } = {}): Promise<{ space: PatientSpace; limited: boolean }> {
     const { patient, membership } = await requireMember(ctx, patientId, "memories:read");
@@ -32,7 +33,15 @@ export async function loadSpace(ctx: QueryCtx, patientId: GenericId<"patients">,
     return { limited, space: {
       id: patientId, name: patient.name, timezone: patient.timezone,
       capabilities: membership.capabilities as PatientSpace["capabilities"],
-      people: people.map((person) => ({ id: person._id, name: person.name, relationship: person.relationship, enrollment: person.enrollment, initials: person.name.split(" ").map((part) => part[0]).slice(0, 2).join(""), color: "green" })),
+      people: await Promise.all(people.map(async (person) => ({
+        id: person._id,
+        name: person.name,
+        relationship: person.relationship,
+        enrollment: person.enrollment,
+        voiceMatchingAvailable: await canMatchPerson(ctx, patientId, patient.createdBy, person),
+        initials: person.name.split(" ").map((part) => part[0]).slice(0, 2).join(""),
+        color: "green" as const,
+      }))),
       conversations: records,
       memories: memories.slice(0, 500).filter((memory) => visibleIds.has(memory.conversationId)).map((memory) => ({
         id: memory._id, kind: memory.kind, title: memory.title, text: memory.text,
@@ -42,8 +51,23 @@ export async function loadSpace(ctx: QueryCtx, patientId: GenericId<"patients">,
     } };
 }
 
+async function canMatchPerson(ctx: QueryCtx, patientId: GenericId<"patients">, patientOwner: string, person: DataModel["people"]["document"]): Promise<boolean> {
+  const isPatient = person.isPatient ?? (person.relationship === "You · patient" && !person.linkedSubject);
+  const subject = isPatient ? patientOwner : person.linkedSubject;
+  if (!subject || !person.voiceConsentAt || person.voiceConsentPolicy !== VOICE_MATCHING_POLICY) return false;
+  const [membership, profile, consents] = await Promise.all([
+    ctx.db.query("memberships").withIndex("by_patient_subject", (q) => q.eq("patientId", patientId).eq("subject", subject)).unique(),
+    person.familyProfileId
+      ? ctx.db.get(person.familyProfileId)
+      : ctx.db.query("familyProfiles").withIndex("by_subject", (q) => q.eq("subject", subject)).unique(),
+    ctx.db.query("consents").withIndex("by_patient_subject_purpose", (q) => q.eq("patientId", patientId).eq("subject", subject).eq("purpose", "voice_matching")).order("desc").take(100),
+  ]);
+  const correctRole = isPatient ? membership?.role === "patient" : membership?.role === "family" && person.linkedSubject === subject;
+  return Boolean(membership?.active && correctRole && profile?.subject === subject && profile.voiceState === "enrolled" && profile.voiceprint && profile.voiceprint.length <= 20_000 && (!person.familyProfileId || person.familyProfileId === profile._id) && consents.some((consent) => !consent.revokedAt && consent.policyVersion === VOICE_MATCHING_POLICY));
+}
+
 function conversationRecord(conversation: DataModel["conversations"]["document"]): PatientSpace["conversations"][number] {
-  return { id: conversation._id, title: conversation.title, summary: conversation.summary, startedAt: new Date(conversation.startedAt).toISOString(), duration: conversation.duration, people: conversation.people, state: conversation.state, turns: [], audioAvailable: false, synthetic: false };
+  return { id: conversation._id, title: conversation.title, summary: conversation.summary, startedAt: new Date(conversation.startedAt).toISOString(), duration: conversation.duration, people: conversation.people, state: conversation.state, turns: [], synthetic: false };
 }
 
 export const space = query({
@@ -82,15 +106,12 @@ export const detail = query({
     if (!conversation || conversation.deletedAt) throw new ConvexError("Conversation unavailable.");
     await requireMember(ctx, conversation.patientId, "memories:read");
     const turns = await ctx.db.query("transcriptTurns").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).take(500);
-    const chunk = await ctx.db.get(conversation.chunkId);
-    const audioUrl = chunk?.patientId === conversation.patientId && chunk.storageId && !chunk.deletedAt && chunk.expiresAt > Date.now() ? await ctx.storage.getUrl(chunk.storageId) : null;
     const memories = await ctx.db.query("memories").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).take(100);
     return {
       patientId: conversation.patientId,
       conversation: conversationRecord(conversation),
       memories: memories.filter((memory) => memory.patientId === conversation.patientId).map((memory) => ({ id: memory._id, kind: memory.kind, title: memory.title, text: memory.text, localDate: memory.localDate, plannedFor: memory.plannedFor, occurredAt: memory.occurredAt, conversationId: memory.conversationId, turnIds: memory.turnIds, people: memory.people })),
       turns: turns.filter((turn) => turn.patientId === conversation.patientId).map((turn) => ({ id: turn._id, speaker: turn.speaker, personId: turn.personId, start: turn.start, end: turn.end, text: turn.text, uncertain: turn.uncertain })),
-      audioUrl,
     };
   },
 });

@@ -6,6 +6,9 @@ import { localDate } from "@hale/contracts/time";
 import { audioDurationLimit } from "@hale/contracts/audio";
 
 const transcribeRef = makeFunctionReference<"action">("transcriptions:transcribe");
+// Long enough for Sarvam's two-hour batch inputs and optional pyannote matching,
+// but still a bounded fallback if a provider job or scheduled worker stalls.
+const TEMP_AUDIO_TTL_MS = 24 * 60 * 60_000;
 
 export const authorizeUpload = internalQuery({
   args: { sessionId: v.id("recordingSessions") },
@@ -21,13 +24,18 @@ export const authorizeUpload = internalQuery({
 });
 
 export const start = mutation({
-  args: { patientId: v.id("patients"), participantsConsented: v.boolean(), captureMode: v.optional(v.union(v.literal("native"), v.literal("web"))) },
+  args: { patientId: v.id("patients"), participantsConsented: v.boolean(), captureMode: v.optional(v.union(v.literal("native"), v.literal("web"))), expectedPeople: v.optional(v.array(v.id("people"))) },
   returns: v.id("recordingSessions"),
-  handler: async (ctx, { patientId, participantsConsented, captureMode }) => {
+  handler: async (ctx, { patientId, participantsConsented, captureMode, expectedPeople = [] }) => {
     const { identity, patient } = await requireMember(ctx, patientId, "recordings:create");
     await requireRecordingConsent(ctx, patientId, identity.subject);
     if (!participantsConsented) throw new ConvexError("Confirm consent from everyone taking part before recording.");
-    return ctx.db.insert("recordingSessions", { patientId, subject: identity.subject, timezone: patient.timezone, startedAt: Date.now(), consentConfirmedAt: Date.now(), state: "recording", captureMode: captureMode ?? "web" });
+    if (expectedPeople.length > 50 || new Set(expectedPeople).size !== expectedPeople.length) throw new ConvexError("Choose up to 50 different people to recognize.");
+    for (const personId of expectedPeople) {
+      const person = await ctx.db.get(personId);
+      if (!person || person.patientId !== patientId) throw new ConvexError("A selected person is not part of this patient space.");
+    }
+    return ctx.db.insert("recordingSessions", { patientId, subject: identity.subject, timezone: patient.timezone, startedAt: Date.now(), consentConfirmedAt: Date.now(), state: "recording", captureMode: captureMode ?? "web", expectedPeople });
   },
 });
 
@@ -59,7 +67,7 @@ export const acceptChunk = internalMutation({
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
     if (!session) throw new ConvexError("Session unavailable.");
-    const { identity, patient } = await requireMember(ctx, session.patientId, "recordings:create");
+    const { identity } = await requireMember(ctx, session.patientId, "recordings:create");
     if (identity.subject !== session.subject) throw new ConvexError("Session owner mismatch.");
     await requireRecordingConsent(ctx, session.patientId, identity.subject);
     const durationLimit = audioDurationLimit(session.captureMode);
@@ -71,13 +79,26 @@ export const acceptChunk = internalMutation({
       return { chunkId: existing._id, duplicate: true };
     }
     const now = Date.now();
-    const chunkId = await ctx.db.insert("audioChunks", { ...args, patientId: session.patientId, state: "queued", expiresAt: now + patient.audioRetentionDays * 86_400_000 });
+    const chunkId = await ctx.db.insert("audioChunks", { ...args, patientId: session.patientId, state: "queued", expiresAt: now + TEMP_AUDIO_TTL_MS });
     const jobId = await ctx.db.insert("processingJobs", { patientId: session.patientId, chunkId, state: "queued", attempts: 0, createdAt: now, updatedAt: now });
-    await ctx.db.insert("conversations", {
+    const conversationId = await ctx.db.insert("conversations", {
       patientId: session.patientId, chunkId, title: "New recording", summary: "Audio uploaded. Waiting for the audio worker; no transcript has been generated yet.",
       startedAt: args.capturedAt, duration: (args.endedAt - args.capturedAt) / 1000,
       localDate: localDate(args.capturedAt, session.timezone), people: [], state: "queued",
     });
+    if (session.expectedPeople?.length) {
+      await ctx.db.insert("speakerMatchingJobs", {
+        patientId: session.patientId,
+        chunkId,
+        conversationId,
+        expectedPeople: session.expectedPeople,
+        state: "queued",
+        attempts: 0,
+        generation: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
     await ctx.scheduler.runAfter(0, transcribeRef, { jobId });
     return { chunkId, duplicate: false };
   },

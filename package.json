@@ -17,17 +17,13 @@
     "typescript": "^5.9.3"
   },
   "scripts": {
-    "dev": "bun run --parallel dev:web dev:mobile:usb backend",
+    "dev": "bun run --parallel dev:web backend",
     "dev:web": "bun run --cwd apps/web dev",
-    "dev:mobile": "bun run --cwd apps/mobile dev",
-    "dev:mobile:usb": "bun run --cwd apps/mobile dev:usb",
-    "mobile:android": "bun run --cwd apps/mobile android",
-    "mobile:apk": "bun run --cwd apps/mobile build:apk",
     "build": "bun run --cwd apps/web build",
     "lint": "bun run --cwd apps/web lint",
-    "typecheck": "bun run --cwd apps/web typecheck && bun run --cwd apps/mobile typecheck && tsc --noEmit -p convex/tsconfig.json",
-    "test": "bun test packages convex apps/web/src/lib apps/mobile/src/lib",
-    "check": "bun run test && bun run lint && bun run typecheck && bun run --cwd apps/mobile check:native && bun run build",
+    "typecheck": "bun run --cwd apps/web typecheck && tsc --noEmit -p convex/tsconfig.json",
+    "test": "bun test packages convex apps/web/src/lib",
+    "check": "bun run test && bun run lint && bun run typecheck && bun run build",
     "production:check": "bun run --cwd apps/web production:check",
     "backend": "convex dev"
   }

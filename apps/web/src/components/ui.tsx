@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight, AudioLines, ChevronRight, Clock3, Leaf, ShieldCheck } from "lucide-react";
 import type { Conversation, Memory } from "@hale/contracts";
 import { memoryLabels } from "@hale/contracts";
-import { clockLabel, dateLabel, localDate } from "@hale/contracts/time";
+import { clockLabel, dateLabel, durationLabel, localDate } from "@hale/contracts/time";
 import { useWorkspace } from "./providers";
 import type { ReactNode } from "react";
 
@@ -62,15 +62,15 @@ export function PrivacyNote({ children }: { children?: ReactNode }) {
   return <div className="notice"><ShieldCheck size={18} /><p>{children ?? "Your memories are private. Only people with permission can see this patient space."}</p></div>;
 }
 
-export function Coverage({ conversations }: { conversations: Conversation[] }) {
+export function Coverage({ conversations, base = "/family" }: { conversations: Conversation[]; base?: string }) {
   const { space } = useWorkspace();
   const seconds = conversations.reduce((sum, conversation) => sum + conversation.duration, 0);
-  return <div className="coverage"><div className="coverage-heading"><span className="eyebrow">RECORDING COVERAGE</span><span><Clock3 size={14} />{Math.floor(seconds / 60)} min recorded</span></div><div className="coverage-track" aria-label={`${Math.floor(seconds / 60)} minutes recorded. Gaps are not recorded activity.`}>
+  return <div className="coverage archive-coverage"><div className="coverage-heading"><span className="eyebrow">24-HOUR COVERAGE</span><span><Clock3 size={14} />{durationLabel(seconds)} recorded</span></div><div className="coverage-track" role="group" aria-label={`${durationLabel(seconds)} recorded. Gaps are not recorded activity.`}>
     {conversations.map((conversation) => {
       const parts = new Intl.DateTimeFormat("en-US", { timeZone: space.timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(conversation.startedAt));
       const hour = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
       const minute = Number(parts.find((part) => part.type === "minute")?.value ?? 0);
-      return <span key={conversation.id} style={{ left: `${(hour * 60 + minute) / 14.4}%`, width: `${Math.max(0.7, conversation.duration / 864)}%` }} title={`${clockLabel(conversation.startedAt, space.timezone)} · ${Math.round(conversation.duration / 60)} min`} />;
+      return <Link key={conversation.id} className="coverage-segment" href={`${base}/conversations/${conversation.id}`} style={{ left: `${(hour * 60 + minute) / 14.4}%`, width: `${Math.max(0.7, conversation.duration / 864)}%` }} aria-label={`Open recording from ${clockLabel(conversation.startedAt, space.timezone)}, ${durationLabel(conversation.duration)}`} title={`${clockLabel(conversation.startedAt, space.timezone)} · ${durationLabel(conversation.duration)}`} />;
     })}
-  </div><div className="coverage-times mono"><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>12 AM</span></div><p>Only recorded moments are shown. The spaces in between are simply unrecorded.</p></div>;
+  </div><div className="coverage-times mono"><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>12 AM</span></div><p>{conversations.length ? "Select a recorded interval to open its conversation. Empty space is simply unrecorded." : "No recorded intervals on this date. Empty space is simply unrecorded."}</p></div>;
 }

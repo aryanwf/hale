@@ -8,11 +8,6 @@
 
 > *healthcare, remembered.*
 
-## apps
-
-- `apps/web`: web patient and family dashboards
-- `apps/mobile`: android Expo patient companion
-
 ## todo
 
 - [x] account signup, patient and family flows
@@ -31,10 +26,8 @@
 - [ ] memory extraction
 - [ ] speaker matching
 - [ ] nightly summaries
-- [x] Expo Android capture implementation
-- [x] native background recording configuration and durable upload queue
-- [ ] physical-device background capture verification
-- [ ] smartwatch and wearable capture
+- [ ] android, smartwatch, wearable capture
+- [ ] background recording
 
 ### family dashboard
 

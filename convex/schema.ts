@@ -33,7 +33,6 @@ export default defineSchema({
     endedAt: v.optional(v.number()), timezone: v.string(),
     state: v.union(v.literal("recording"), v.literal("paused"), v.literal("interrupted"), v.literal("stopped")),
     consentConfirmedAt: v.number(),
-    captureMode: v.optional(v.union(v.literal("native"), v.literal("web"))),
   }).index("by_patient", ["patientId"]),
   audioChunks: defineTable({
     patientId: v.id("patients"), sessionId: v.id("recordingSessions"),

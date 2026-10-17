@@ -5,8 +5,6 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./api": "./src/api.ts",
-    "./audio": "./src/audio.ts",
     "./demo": "./src/demo.ts",
     "./recall": "./src/recall.ts",
     "./time": "./src/time.ts",

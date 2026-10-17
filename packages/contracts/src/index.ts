@@ -43,6 +43,7 @@ export interface Conversation {
   state: ProcessingState;
   turns: TranscriptTurn[];
   audioAvailable: boolean;
+  audioUrl?: string;
   synthetic: boolean;
 }
 

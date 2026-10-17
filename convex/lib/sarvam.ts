@@ -31,9 +31,12 @@ export type SarvamChatMessage = {
 };
 
 export class SarvamApiError extends Error {
+  readonly status?: number;
+
   constructor(operation: string, status?: number) {
     super(status ? `Sarvam ${operation} failed (HTTP ${status}).` : `Sarvam ${operation} returned an invalid response.`);
     this.name = "SarvamApiError";
+    this.status = status;
   }
 }
 
@@ -83,10 +86,11 @@ export async function transcribeAudio(
   }
 
   const form = new FormData();
-  const extension = audio.type === "audio/wav" || audio.type === "audio/x-wav" ? "wav"
-    : audio.type === "audio/mpeg" ? "mp3"
-      : audio.type === "audio/mp4" || audio.type === "audio/aac" ? "m4a"
-        : audio.type === "audio/ogg" ? "ogg"
+  const mimeType = audio.type.split(";")[0]?.trim().toLowerCase();
+  const extension = mimeType === "audio/wav" || mimeType === "audio/x-wav" ? "wav"
+    : mimeType === "audio/mpeg" ? "mp3"
+      : mimeType === "audio/mp4" || mimeType === "video/mp4" || mimeType === "audio/aac" ? "m4a"
+        : mimeType === "audio/ogg" ? "ogg"
           : audio.type === "audio/flac" ? "flac"
             : "webm";
   form.set("file", audio, options.filename ?? `recording.${extension}`);

@@ -45,7 +45,7 @@
 
 .sectionNav {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
   gap: 12px;
   padding: 20px 0 24px;
   border-top: 1px solid var(--rule);
@@ -208,6 +208,94 @@
 .reportButtons { flex-wrap: wrap; }
 .medicationFootnote { margin-top: 13px; max-width: 100ch; }
 
+.loadingState { padding: 24px 2px; color: var(--muted); font-size: 13px; }
+.appointmentGroup, .suggestionGroup, .contactListSection, .alertGroup { margin-top: 31px; }
+.subsectionHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
+.subsectionHeading h3 { font-size: 16px; font-weight: 550; letter-spacing: -.025em; line-height: 1.4; }
+.subsectionHeading p { margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.subsectionHeading > span { flex: 0 0 auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.confirmedList { margin: 0; }
+.confirmedItem { display: grid; grid-template-columns: minmax(150px, .8fr) minmax(0, 2fr) auto; align-items: center; gap: 20px; padding: 17px 0; border-bottom: 1px solid var(--rule); }
+.confirmedWhen { display: grid; gap: 2px; }
+.confirmedWhen strong { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.confirmedWhen > span { color: var(--muted); font-size: 11px; }
+.confirmedCopy { min-width: 0; }
+.confirmedCopy h4 { font-size: 14px; font-weight: 550; line-height: 1.45; }
+.confirmedCopy p { margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.confirmedStatus { display: inline-flex; align-items: center; gap: 5px; color: #42634C; font-size: 11px; font-weight: 500; white-space: nowrap; }
+.quietEmpty { padding: 17px 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+
+.suggestionGroup { padding-top: 4px; }
+.urgentRail { margin-top: 18px; padding: 17px 19px 17px 16px; border-left: 4px solid var(--rescue); border-radius: 0 8px 8px 0; background: var(--rescue-mist); }
+.urgentRailHeading { display: flex; align-items: flex-start; gap: 11px; }
+.urgentIcon { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #fff; color: var(--rescue); }
+.urgentRailHeading h3, .urgentRailHeading h4 { font-size: 15px; font-weight: 650; letter-spacing: -.015em; line-height: 1.45; }
+.urgentRailHeading p { margin-top: 3px; color: #60392F; font-size: 12px; line-height: 1.65; }
+.urgentProposalList { margin-top: 4px; }
+.routineProposalList { margin-top: 6px; }
+.proposal { padding: 18px 0; border-bottom: 1px solid var(--rule); }
+.urgentProposal { border-color: #E7C7BE; }
+.proposalHeader, .alertItemTop { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.proposalHeader h4, .alertItemTop h4 { margin-top: 3px; font-size: 15px; font-weight: 550; letter-spacing: -.02em; line-height: 1.45; }
+.proposalHeader time, .alertItemTop time { flex: 0 0 auto; color: var(--muted); font-size: 11px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.proposalLabel, .urgentLabel { display: inline-block; font-size: 11px; font-weight: 550; line-height: 1.5; }
+.proposalLabel { color: var(--muted); }
+.urgentLabel { color: #842B18; }
+.proposalSummary { margin-top: 7px; color: var(--ink); font-size: 13px; line-height: 1.7; }
+.evidenceDetails { margin-top: 10px; color: var(--muted); font-size: 12px; }
+.evidenceDetails summary { width: fit-content; cursor: pointer; color: var(--accent); font-weight: 500; }
+.evidenceDetails blockquote { max-width: 84ch; margin: 9px 0 0; padding-left: 13px; border-left: 2px solid var(--rule-strong); color: var(--ink); font-size: 12px; line-height: 1.75; white-space: pre-wrap; }
+.reviewForm { margin-top: 14px; }
+.dateFieldWrap { max-width: 440px; margin-bottom: 13px; }
+.fieldLabel { display: grid; gap: 6px; color: var(--ink); font-size: 12px; font-weight: 550; }
+.fieldLabel > span { display: inline; color: var(--muted); font-weight: 400; }
+.fieldLabel input { width: 100%; min-height: 43px; padding: 9px 11px; border: 1px solid var(--rule-strong); border-radius: 6px; background: #fff; font-size: 13px; }
+.fieldLabel input:focus-visible { border-color: var(--accent); }
+.fieldHint { margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.reviewActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.reviewActions .btn { min-height: 42px; }
+.formError, .formSuccess, .notificationMessage { margin-top: 9px; font-size: 12px; line-height: 1.6; }
+.formError { color: #9A321B; }
+.formSuccess { color: #42634C; }
+
+.contactForm { margin-top: 3px; padding: 20px; border: 1px solid var(--rule); border-radius: 8px; background: #fff; }
+.formHeading h3 { font-size: 15px; font-weight: 550; letter-spacing: -.02em; }
+.formHeading p { margin-top: 3px; color: var(--muted); font-size: 12px; }
+.contactFields { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(180px, 1.25fr) auto; align-items: end; gap: 12px; margin-top: 16px; }
+.contactFields .btn { min-height: 43px; white-space: nowrap; }
+.contactListSection { margin-top: 27px; }
+.contactList { margin: 0; }
+.contactItem { display: flex; align-items: center; gap: 13px; padding: 15px 0; border-bottom: 1px solid var(--rule); }
+.contactAvatar { display: grid; width: 39px; height: 39px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: var(--shade); color: var(--accent-deep); font-size: 15px; font-weight: 550; }
+.contactCopy { display: grid; min-width: 0; flex: 1; gap: 1px; }
+.contactCopy strong { overflow: hidden; font-size: 13px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.contactCopy > span { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.contactCopy small { color: var(--muted); font-size: 10px; }
+.removeButton { min-height: 38px; padding: 7px 12px; font-size: 12px; }
+
+.notificationControls { display: flex; align-items: center; gap: 12px; margin: 2px 0 26px; padding: 14px 15px; border: 1px solid var(--rule); border-radius: 8px; background: var(--ground); }
+.notificationIcon { display: grid; width: 37px; height: 37px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: var(--shade); color: var(--accent); }
+.notificationCopy { min-width: 0; flex: 1; }
+.notificationCopy h3 { font-size: 13px; font-weight: 550; }
+.notificationCopy p { margin-top: 2px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.notificationCopy .formSuccess, .notificationMessage { margin-top: 5px; }
+.notificationControls > .btn { min-height: 39px; flex: 0 0 auto; padding: 8px 14px; font-size: 12px; }
+.alertGroup { margin-top: 28px; }
+.alertList { margin-top: 4px; }
+.alertItem { padding: 17px 0; border-bottom: 1px solid var(--rule); }
+.alertItemTop h4 { font-size: 14px; }
+.alertBody { margin-top: 7px; color: var(--ink); font-size: 12px; line-height: 1.7; }
+.alertMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 9px 16px; margin-top: 11px; }
+.emailState, .acknowledged, .unacknowledged { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; }
+.acknowledged { color: #42634C; }
+.unacknowledged { color: #842B18; font-weight: 550; }
+.evidenceLinks { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 10px; }
+.evidenceLink { display: inline-flex; width: fit-content; align-items: center; gap: 5px; color: var(--accent); font-size: 11px; font-weight: 500; line-height: 1.6; }
+.evidenceLink:hover { text-decoration: underline; text-underline-offset: 3px; }
+.noEvidence { margin-top: 10px; color: var(--muted); font-size: 11px; }
+.acknowledgeButton { min-height: 38px; margin-top: 12px; padding: 7px 13px; font-size: 12px; }
+
 .confirmDialog { border-radius: 12px; }
 
 @media (max-width: 760px) {
@@ -247,6 +335,22 @@
   .reportButtons { display: grid; grid-template-columns: 1fr; }
   .reportButtons .btn { width: 100%; }
   .rideOptions > a { width: 100%; }
+  .confirmedItem { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; }
+  .confirmedWhen { grid-column: 1 / -1; }
+  .confirmedStatus { grid-column: 2; grid-row: 2; }
+  .confirmedCopy { grid-column: 1; grid-row: 2; }
+  .contactForm { padding: 16px; }
+  .contactFields { grid-template-columns: 1fr; }
+  .contactFields .btn { width: 100%; }
+  .contactItem { gap: 9px; }
+  .removeButton { width: 40px; min-width: 40px; overflow: hidden; gap: 0; padding: 0; color: transparent; font-size: 0; }
+  .removeButton svg { color: var(--muted); }
+  .notificationControls { align-items: flex-start; flex-wrap: wrap; }
+  .notificationControls > .btn { margin-left: 49px; }
+  .proposalHeader, .alertItemTop { flex-direction: column; gap: 4px; }
+  .reviewActions { display: grid; grid-template-columns: 1fr; }
+  .reviewActions .btn { width: 100%; }
+  .subsectionHeading { gap: 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

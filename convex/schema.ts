@@ -54,6 +54,9 @@ export default defineSchema({
     endedAt: v.optional(v.number()), timezone: v.string(),
     state: v.union(v.literal("recording"), v.literal("paused"), v.literal("interrupted"), v.literal("stopped")),
     consentConfirmedAt: v.number(),
+    consentRevokedAt: v.optional(v.number()),
+    externalAIRevokedAt: v.optional(v.number()),
+    privacyDeletedAt: v.optional(v.number()),
     captureMode: v.optional(v.union(v.literal("native"), v.literal("web"))),
     continuous: v.optional(v.boolean()), conversationId: v.optional(v.id("conversations")),
     lastChunkAt: v.optional(v.number()),
@@ -83,7 +86,8 @@ export default defineSchema({
     providerJobId: v.optional(v.string()),
     candidates: v.optional(v.array(v.object({ label: v.string(), personId: v.id("people"), profileId: v.id("familyProfiles"), enrollmentVersion: v.number() }))),
     updatedAt: v.number(), createdAt: v.number(),
-  }).index("by_chunk", ["chunkId"]).index("by_state_updated", ["state", "updatedAt"]),
+  }).index("by_chunk", ["chunkId"]).index("by_state_updated", ["state", "updatedAt"])
+    .index("by_patientId", ["patientId"]),
   conversations: defineTable({
     patientId: v.id("patients"), chunkId: v.id("audioChunks"),
     title: v.string(), summary: v.string(), startedAt: v.number(), duration: v.number(),
@@ -92,7 +96,8 @@ export default defineSchema({
     deletedAt: v.optional(v.number()),
     sessionId: v.optional(v.id("recordingSessions")), pendingChunks: v.optional(v.number()),
     failedChunks: v.optional(v.number()), processedChunks: v.optional(v.number()),
-  }).index("by_patient_date", ["patientId", "localDate"]).index("by_chunk", ["chunkId"]),
+  }).index("by_patient_date", ["patientId", "localDate"]).index("by_chunk", ["chunkId"])
+    .index("by_patient_deletedAt_date", ["patientId", "deletedAt", "localDate"]),
   transcriptTurns: defineTable({
     patientId: v.id("patients"), conversationId: v.id("conversations"),
     speaker: v.string(), personId: v.optional(v.id("people")),
@@ -140,4 +145,46 @@ export default defineSchema({
     patientId: v.id("patients"), actor: v.string(), operation: v.string(),
     target: v.string(), timestamp: v.number(),
   }).index("by_patient", ["patientId", "timestamp"]).index("by_actor", ["actor"]),
+  privacySettings: defineTable({
+    patientId: v.id("patients"), retentionDays: v.union(v.literal(7), v.literal(30), v.null()),
+    updatedAt: v.number(), updatedBy: v.string(),
+  }).index("by_patient", ["patientId"]),
+  emergencyContacts: defineTable({
+    patientId: v.id("patients"), createdBy: v.string(), name: v.string(), email: v.string(), enabled: v.boolean(), createdAt: v.number(),
+  }).index("by_patient_createdAt", ["patientId", "createdAt"])
+    .index("by_patient_email", ["patientId", "email"])
+    .index("by_patient_createdBy", ["patientId", "createdBy"])
+    .index("by_createdBy", ["createdBy"]),
+  webNotificationSubscriptions: defineTable({
+    patientId: v.id("patients"), subject: v.string(), endpoint: v.string(),
+    p256dh: v.string(), auth: v.string(), createdAt: v.number(), updatedAt: v.number(),
+  }).index("by_patient_subject", ["patientId", "subject"])
+    .index("by_patient_subject_endpoint", ["patientId", "subject", "endpoint"])
+    .index("by_patient", ["patientId"]).index("by_subject", ["subject"]),
+  careProposals: defineTable({
+    patientId: v.id("patients"), conversationId: v.id("conversations"), sourceChunkId: v.id("audioChunks"),
+    kind: v.union(v.literal("appointment"), v.literal("urgent")),
+    priority: v.union(v.literal("routine"), v.literal("urgent")),
+    status: v.union(v.literal("needs_review"), v.literal("confirmed"), v.literal("dismissed"), v.literal("resolved")),
+    title: v.string(), summary: v.string(), proposedAt: v.union(v.number(), v.null()),
+    scheduledAt: v.union(v.number(), v.null()), createdAt: v.number(),
+    turnIds: v.array(v.id("transcriptTurns")), sourceText: v.string(), sourceKey: v.string(),
+    reminderJobIds: v.optional(v.array(v.id("_scheduled_functions"))),
+  }).index("by_patient_status_createdAt", ["patientId", "status", "createdAt"])
+    .index("by_patient_kind_status_createdAt", ["patientId", "kind", "status", "createdAt"])
+    .index("by_patient_createdAt", ["patientId", "createdAt"])
+    .index("by_conversation", ["conversationId"])
+    .index("by_sourceKey", ["sourceKey"]),
+  careAlerts: defineTable({
+    patientId: v.id("patients"), conversationId: v.optional(v.id("conversations")),
+    kind: v.union(v.literal("urgent"), v.literal("appointment_reminder")),
+    priority: v.union(v.literal("routine"), v.literal("urgent")),
+    title: v.string(), body: v.string(), createdAt: v.number(),
+    emailStatus: v.union(v.literal("pending"), v.literal("sent"), v.literal("skipped"), v.literal("failed")),
+    pushStatus: v.union(v.literal("pending"), v.literal("sent"), v.literal("skipped"), v.literal("failed")),
+    acknowledged: v.boolean(), turnIds: v.array(v.id("transcriptTurns")), sourceKey: v.string(),
+    emailJobId: v.optional(v.id("_scheduled_functions")), pushJobId: v.optional(v.id("_scheduled_functions")),
+  }).index("by_patient_createdAt", ["patientId", "createdAt"])
+    .index("by_conversation", ["conversationId"])
+    .index("by_sourceKey", ["sourceKey"]),
 });

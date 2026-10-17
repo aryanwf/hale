@@ -6,8 +6,10 @@ import * as privacy from "./privacy";
 import * as recordings from "./recordings";
 import * as transcriptions from "./transcriptions";
 import * as speakerMatching from "./speakerMatching";
+import * as care from "./care";
+import * as eventDetection from "./eventDetection";
 
-const app = defineTestApp({ schema }).defineModules({ patients, privacy, recordings, transcriptions, speakerMatching });
+const app = defineTestApp({ schema }).defineModules({ patients, privacy, recordings, transcriptions, speakerMatching, care, eventDetection });
 const tests: ReturnType<typeof app.createTest>[] = [];
 const originalFetch = globalThis.fetch;
 let previousKey: string | undefined;
@@ -41,7 +43,7 @@ async function setup() {
   tests.push(t);
   const owner = t.withIdentity({ subject: "transcription-owner" });
   const patientId = await owner.mutation(app.api.patients.create, {
-    name: "Fictional Patient", timezone: "UTC", recordingConsent: true,
+    name: "Fictional Patient", timezone: "UTC", recordingConsent: true, externalAIConsent: true,
   });
   const capturedAt = Date.now() - 30_000;
   const seeded = await t.run(async (ctx) => {
@@ -78,7 +80,7 @@ describe("Sarvam conversation transcription", () => {
     const t = app.createTest();
     tests.push(t);
     const owner = t.withIdentity({ subject: "upload-owner" });
-    const patientId = await owner.mutation(app.api.patients.create, { name: "Fictional Patient", timezone: "UTC", recordingConsent: true });
+    const patientId = await owner.mutation(app.api.patients.create, { name: "Fictional Patient", timezone: "UTC", recordingConsent: true, externalAIConsent: true });
     const sessionId = await owner.mutation(app.api.recordings.start, { patientId, participantsConsented: true });
     const capturedAt = Date.now() - 1_000;
     const endedAt = Date.now();
@@ -96,7 +98,7 @@ describe("Sarvam conversation transcription", () => {
     const t = app.createTest();
     tests.push(t);
     const owner = t.withIdentity({ subject: "expected-speaker-owner" });
-    const patientId = await owner.mutation(app.api.patients.create, { name: "Fictional Patient", timezone: "UTC", recordingConsent: true });
+    const patientId = await owner.mutation(app.api.patients.create, { name: "Fictional Patient", timezone: "UTC", recordingConsent: true, externalAIConsent: true });
     const personId = await t.run(async (ctx) => (await ctx.db.query("people").withIndex("by_patient", (q) => q.eq("patientId", patientId)).first())!._id);
     const sessionId = await owner.mutation(app.api.recordings.start, { patientId, participantsConsented: true, expectedPeople: [personId] });
     const capturedAt = Date.now() - 1_000;
@@ -113,7 +115,7 @@ describe("Sarvam conversation transcription", () => {
     await t.action(app.internal.transcriptions.transcribe, { jobId });
     expect(await t.run((ctx) => ctx.db.get(matchJobId))).toMatchObject({ state: "queued", expectedPeople: [personId] });
     expect(await t.run((ctx) => ctx.storage.getUrl(storageId))).not.toBeNull();
-    expect(await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(2);
+    expect(await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(3);
     await t.action(app.internal.speakerMatching.process, { jobId: matchJobId });
 
     expect(await t.run((ctx) => ctx.storage.getUrl(storageId))).toBeNull();
@@ -198,7 +200,7 @@ describe("Sarvam conversation transcription", () => {
     expect(calls).toBe(1);
     expect(await t.run((ctx) => ctx.db.query("transcriptTurns").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).collect())).toHaveLength(0);
     expect(await t.run((ctx) => ctx.db.get(conversationId))).toMatchObject({ deletedAt: expect.any(Number), title: "Deleted conversation" });
-    expect(await t.run((ctx) => ctx.db.get(chunkId))).toMatchObject({ deletedAt: expect.any(Number), state: "failed" });
+    expect(await t.run((ctx) => ctx.db.get(chunkId))).toBeNull();
     expect(await t.run((ctx) => ctx.db.get(jobId))).toMatchObject({ state: "failed", error: "Source deleted." });
   });
 

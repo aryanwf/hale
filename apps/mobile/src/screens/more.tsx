@@ -4,6 +4,7 @@ import { useCapture } from "../providers/capture";
 import { useWorkspace } from "../providers/workspace";
 import { config } from "../lib/config";
 import { styles } from "../theme";
+import { FamilyLink } from "../components/family-link";
 
 export function MoreScreen() {
   const { space, mode, patients, selectPatient, signOut } = useWorkspace();
@@ -14,6 +15,7 @@ export function MoreScreen() {
     void Linking.openURL(new URL("/signup/voice", config.webUrl).toString()).catch(() => Alert.alert("Couldn’t open the dashboard", "Try opening Hale in your browser."));
   }
   return <Page eyebrow="YOUR SPACE, YOUR CHOICES" title="A little more\npeace of mind." description="Familiar people, your privacy, and the choices that stay yours.">
+    {mode === "live" && <FamilyLink patientId={space.id} disabled={busy} />}
     <Text style={styles.heading}>The voices you know.</Text>
     {space.people.length ? space.people.map((person) => <View key={person.id} style={styles.card}><View style={styles.row}><View style={styles.avatar}><Text style={styles.title}>{person.initials}</Text></View><View style={styles.grow}><Text style={styles.title}>{person.name}</Text><Text style={styles.small}>{person.relationship}</Text></View></View><Text style={styles.small}>{mode === "demo" ? "Demo enrollment · no real voiceprint" : person.enrollment === "enrolled" ? "Voice enrolled with consent" : person.enrollment === "revoked" ? "Voice enrollment revoked" : "Voice not enrolled"}</Text><Text style={styles.small}>{space.conversations.filter((item) => item.people.includes(person.id)).length} linked conversations</Text></View>) : <Empty title="Your circle starts here." description="Familiar people will appear when profiles are added to your patient space." />}
     <Notice>A person is more than a voice match. Profiles don’t grant account access, establish consent, or prove someone was physically present. Uncertain speakers stay unnamed. Account voiceprints are not yet matched to patient-space conversations.</Notice>

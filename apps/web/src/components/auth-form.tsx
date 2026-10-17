@@ -31,19 +31,17 @@ const appearance = {
   },
 };
 
-function LiveAuth({ signup, patient }: { signup: boolean; patient: boolean }) {
+function LiveAuth({ signup }: { signup: boolean }) {
   const { isLoaded, isSignedIn } = useAuth();
-  const destination = patient ? "/patient/today" : "/signup/voice";
+  const destination = "/family/overview";
   if (!isLoaded) {
     return <p role="status" className="muted">Opening a secure connection…</p>;
   }
 
   if (isSignedIn) {
     const nextStep = signup
-      ? patient
-        ? "Next, create your own private patient space."
-        : "Next, introduce yourself and choose whether to set up your voice."
-      : "Your private memory space is waiting for you.";
+      ? "Next, get your family code and connect with the patient’s Android app."
+      : "Your family dashboard is waiting for you.";
 
     return (
       <div className="auth-signed-in">
@@ -59,7 +57,7 @@ function LiveAuth({ signup, patient }: { signup: boolean; patient: boolean }) {
   }
 
   return signup
-    ? <SignUp path={patient ? "/signup/patient" : "/signup"} routing="path" signInUrl="/login" forceRedirectUrl={destination} appearance={appearance} />
+    ? <SignUp path="/signup" routing="path" signInUrl="/login" forceRedirectUrl={destination} appearance={appearance} />
     : <SignIn path="/login" routing="path" signUpUrl="/signup" fallbackRedirectUrl="/family/overview" appearance={appearance} />;
 }
 
@@ -67,16 +65,14 @@ function AuthUnavailable() {
   return <div className="auth-setup-notice" role="status"><LockKeyhole size={24} /><h2>Authentication isn’t configured.</h2><p>Sign-in and account creation require a connected Clerk application and Convex backend. There is no preview login or pretend account.</p><p className="small muted">Configure live mode using the deployment instructions in README.md, then restart the application.</p></div>;
 }
 
-export function AuthPage({ signup = false, patient = false }: { signup?: boolean; patient?: boolean }) {
+export function AuthPage({ signup = false }: { signup?: boolean }) {
   const live = appMode === "live";
   const introDescription = !signup
-    ? "Log in to reconnect with the conversations, people, and little moments that matter."
-    : patient
-      ? "Create your own memory space. Keep the moments that matter close, and choose who can join your circle."
-      : "Create your family account and help keep the moments that matter close.";
+    ? "Log in to see the conversations and little moments your loved one shares with you."
+    : "Create your family account. Get a private family code for your loved one to enter in the Hale Android app.";
 
   return (
-    <AuthShell signup={signup} patient={patient}>
+    <AuthShell signup={signup}>
       <div className="auth-intro">
         <p className="eyebrow">{signup ? "A LITTLE CLOSER, EVEN FROM AFAR" : "A FAMILIAR PLACE TO RETURN TO"}</p>
         <h1>
@@ -84,15 +80,10 @@ export function AuthPage({ signup = false, patient = false }: { signup?: boolean
         </h1>
         <p>{introDescription}</p>
       </div>
-      {signup && (
-        <nav className="auth-account-type" aria-label="Who is this account for?">
-          <Link href="/signup" aria-current={!patient ? "page" : undefined}>I’m a family member</Link>
-          <Link href="/signup/patient" aria-current={patient ? "page" : undefined}>I’m here for myself</Link>
-        </nav>
-      )}
+      {signup && <p className="auth-account-type">For family members · patients use the Hale Android app</p>}
       {!live && <AuthUnavailable />}
-      {live && signup && <LiveAuth signup patient={patient} />}
-      {live && !signup && <LoginPanel patient={patient} />}
+      {live && signup && <LiveAuth signup />}
+      {live && !signup && <LoginPanel />}
       <p className="auth-privacy">
         <ShieldCheck size={15} />
         <span>{signup ? "Joining doesn’t grant access to anyone’s memories. Patient-space permission is always required." : "Your memories stay in your circle. Access is always permission-based."}</span>
@@ -101,7 +92,7 @@ export function AuthPage({ signup = false, patient = false }: { signup?: boolean
   );
 }
 
-function LoginPanel({ patient }: { patient: boolean }) {
+function LoginPanel() {
   return (
     <section className="auth-login-card" aria-label="Secure sign-in">
       <header className="auth-login-card-heading">
@@ -111,7 +102,7 @@ function LoginPanel({ patient }: { patient: boolean }) {
           <h2>Sign in securely</h2>
         </div>
       </header>
-      <LiveAuth signup={false} patient={patient} />
+      <LiveAuth signup={false} />
     </section>
   );
 }

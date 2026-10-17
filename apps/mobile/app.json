@@ -15,6 +15,11 @@
       "softwareKeyboardLayoutMode": "resize"
     },
     "plugins": [
+      ["expo-camera", {
+        "cameraPermission": "Hale uses your camera only to scan a family dashboard QR code when you choose to connect.",
+        "recordAudioAndroid": false,
+        "barcodeScannerEnabled": true
+      }],
       ["expo-audio", {
         "microphonePermission": "Hale records conversations only when you start recording and everyone taking part agrees. Recording can continue when your screen locks.",
         "enableBackgroundRecording": true,

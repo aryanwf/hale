@@ -10,6 +10,7 @@ import {
 } from "./lib/sarvam";
 import { requireMember } from "./authz";
 import { internalAction, internalMutation, internalQuery, mutation, type MutationCtx } from "./lib/functions";
+import { conversationForChunk, refreshLiveConversation, settleLiveChunk } from "./lib/liveConversations";
 
 const transcribeRef = makeFunctionReference<"action">("transcriptions:transcribe");
 const claimRef = makeFunctionReference<"mutation">("transcriptions:claim");
@@ -92,7 +93,7 @@ export const claim = internalMutation({
     const job = await ctx.db.get(jobId);
     if (!job || job.state !== "queued") return null;
     const chunk = await ctx.db.get(job.chunkId);
-    const conversation = await ctx.db.query("conversations").withIndex("by_chunk", (q) => q.eq("chunkId", job.chunkId)).unique();
+    const conversation = chunk ? await conversationForChunk(ctx, chunk) : null;
     if (!chunk || chunk.patientId !== job.patientId || chunk.deletedAt || !conversation || conversation.patientId !== job.patientId || conversation.deletedAt) {
       const now = Date.now();
       if (chunk) {
@@ -115,7 +116,8 @@ export const claim = internalMutation({
       if (speakerJob && !["ready", "failed", "skipped"].includes(speakerJob.state)) {
         await ctx.db.patch(speakerJob._id, { state: "failed", providerJobId: undefined, generation: speakerJob.generation + 1, error: "Transcription could not start before temporary audio expired.", updatedAt: now });
       }
-      await ctx.db.patch(conversation._id, { state: "failed", summary: "Transcription could not start before temporary audio expired. The temporary audio was deleted; record again to retry." });
+      if (conversation.sessionId) await settleLiveChunk(ctx, conversation, "failed");
+      else await ctx.db.patch(conversation._id, { state: "failed", summary: "Transcription could not start before temporary audio expired. The temporary audio was deleted; record again to retry." });
       return null;
     }
 
@@ -123,12 +125,13 @@ export const claim = internalMutation({
     const generation = (job.generation ?? 0) + 1;
     await ctx.db.patch(jobId, { state: "processing", attempts: (job.attempts ?? 0) + 1, generation, updatedAt: now, error: undefined });
     await ctx.db.patch(chunk._id, { state: "processing" });
-    await ctx.db.patch(conversation._id, { state: "processing", summary: "Sarvam AI is preparing a timestamped transcript. Speakers remain unnamed." });
+    if (!conversation.sessionId) await ctx.db.patch(conversation._id, { state: "processing", summary: "Sarvam AI is preparing a timestamped transcript. Speakers remain unnamed." });
     return {
       storageId: chunk.storageId,
       durationSeconds: (chunk.endedAt - chunk.capturedAt) / 1000,
       mimeType: chunk.mimeType,
       generation,
+      continuous: Boolean(conversation.sessionId),
     };
   },
 });
@@ -144,27 +147,35 @@ export const complete = internalMutation({
     const job = await ctx.db.get(args.jobId);
     if (!job || job.state !== "processing" || job.generation !== args.generation) return false;
     const chunk = await ctx.db.get(job.chunkId);
-    const conversation = await ctx.db.query("conversations").withIndex("by_chunk", (q) => q.eq("chunkId", job.chunkId)).unique();
+    const conversation = chunk ? await conversationForChunk(ctx, chunk) : null;
     if (!chunk || chunk.patientId !== job.patientId || chunk.deletedAt || !conversation || conversation.patientId !== job.patientId || conversation.deletedAt) return false;
-    if (!args.turns.length || args.turns.length > MAX_TURNS || args.turns.some((turn) =>
-      !Number.isFinite(turn.start) || !Number.isFinite(turn.end) || turn.start < 0 || turn.end <= turn.start || turn.end > conversation.duration + 1 ||
+    const chunkDuration = (chunk.endedAt - chunk.capturedAt) / 1000;
+    if ((!args.turns.length && !conversation.sessionId) || args.turns.length > MAX_TURNS || args.turns.some((turn) =>
+      !Number.isFinite(turn.start) || !Number.isFinite(turn.end) || turn.start < 0 || turn.end <= turn.start || turn.end > chunkDuration + 1 ||
       !turn.text.trim() || turn.text.length > MAX_TRANSCRIPT_CHARACTERS,
     )) throw new ConvexError("The transcription result was invalid.");
 
     const now = Date.now();
+    const offset = conversation.sessionId ? (chunk.capturedAt - conversation.startedAt) / 1000 : 0;
     for (const turn of args.turns) {
       await ctx.db.insert("transcriptTurns", {
         patientId: job.patientId,
         conversationId: conversation._id,
+        chunkId: chunk._id,
         speaker: "Unknown speaker",
-        start: turn.start,
-        end: turn.end,
+        start: offset + turn.start,
+        end: offset + turn.end,
         text: turn.text,
         uncertain: true,
       });
     }
     await ctx.db.patch(job._id, { state: "ready", error: undefined, providerJobId: undefined, updatedAt: now });
     await ctx.db.patch(chunk._id, { state: "ready" });
+    if (conversation.sessionId) {
+      await deleteTemporaryAudio(ctx, chunk._id, chunk.storageId);
+      await settleLiveChunk(ctx, conversation, "ready");
+      return true;
+    }
     const speakerJob = await ctx.db.query("speakerMatchingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", chunk._id)).unique();
     await ctx.db.patch(conversation._id, {
       state: speakerJob ? "processing" : "ready",
@@ -185,7 +196,7 @@ export const fail = internalMutation({
     const job = await ctx.db.get(jobId);
     if (!job || job.state !== "processing" || job.generation !== generation) return null;
     const chunk = await ctx.db.get(job.chunkId);
-    const conversation = await ctx.db.query("conversations").withIndex("by_chunk", (q) => q.eq("chunkId", job.chunkId)).unique();
+    const conversation = chunk ? await conversationForChunk(ctx, chunk) : null;
     if (!chunk || chunk.deletedAt || !conversation || conversation.deletedAt) {
       const now = Date.now();
       if (chunk) {
@@ -202,7 +213,7 @@ export const fail = internalMutation({
     if (willRetry) {
       await ctx.db.patch(jobId, { state: "queued", error: "Temporary Sarvam transcription error; retry scheduled.", updatedAt: now });
       await ctx.db.patch(chunk._id, { state: "queued" });
-      await ctx.db.patch(conversation._id, { state: "queued", summary: "A temporary transcription problem occurred. Hale will retry automatically." });
+      if (!conversation.sessionId) await ctx.db.patch(conversation._id, { state: "queued", summary: "A temporary transcription problem occurred. Hale will retry automatically." });
       const delayMs = Math.min(2_000 * 2 ** Math.max(0, (job.attempts ?? 1) - 1), 15_000);
       await ctx.scheduler.runAfter(delayMs, transcribeRef, { jobId });
       return null;
@@ -213,6 +224,10 @@ export const fail = internalMutation({
     await ctx.db.patch(chunk._id, { state: "failed" });
     await deleteTemporaryAudio(ctx, chunk._id, chunk.storageId);
     await failSpeakerJob(ctx, chunk._id, now, "Transcription failed; temporary audio was deleted.");
+    if (conversation.sessionId) {
+      await settleLiveChunk(ctx, conversation, "failed");
+      return null;
+    }
     await ctx.db.patch(conversation._id, {
       state: "failed",
       summary: unsupportedDuration
@@ -231,6 +246,7 @@ export const transcribe = internalAction({
       durationSeconds: number;
       mimeType: string;
       generation: number;
+      continuous: boolean;
     } | null = await ctx.runMutation(claimRef, { jobId });
     if (!claimed) return null;
 
@@ -249,7 +265,7 @@ export const transcribe = internalAction({
         withTimestamps: true,
       });
       const turns = makeUnknownTurns(result.transcript, result.timestamps, claimed.durationSeconds);
-      if (!turns.length) throw new Error("Sarvam returned no transcript.");
+      if (!turns.length && !claimed.continuous) throw new Error("Sarvam returned no transcript.");
       await ctx.runMutation(completeRef, { jobId, generation: claimed.generation, turns, languageCode: result.languageCode ?? undefined });
     } catch (error) {
       const retryable = isRetryableSarvamError(error);
@@ -293,7 +309,7 @@ export const recoverStale = internalMutation({
       .take(50);
     for (const job of stale) {
       const chunk = await ctx.db.get(job.chunkId);
-      const conversation = await ctx.db.query("conversations").withIndex("by_chunk", (q) => q.eq("chunkId", job.chunkId)).unique();
+      const conversation = chunk ? await conversationForChunk(ctx, chunk) : null;
       if (!chunk || chunk.deletedAt || !conversation || conversation.deletedAt) {
         const now = Date.now();
         if (chunk) {
@@ -308,14 +324,15 @@ export const recoverStale = internalMutation({
         await ctx.db.patch(chunk._id, { state: "failed" });
         await ctx.db.patch(job._id, { state: "failed", providerJobId: undefined, generation: (job.generation ?? 0) + 1, error: "Temporary audio expired before transcription completed.", updatedAt: now });
         await failSpeakerJob(ctx, job.chunkId, now, "Transcription could not complete before temporary audio expired.");
-        await ctx.db.patch(conversation._id, { state: "failed", summary: "A transcript could not be prepared before temporary audio expired. The audio was deleted; record again to retry." });
+        if (conversation.sessionId) await settleLiveChunk(ctx, conversation, "failed");
+        else await ctx.db.patch(conversation._id, { state: "failed", summary: "A transcript could not be prepared before temporary audio expired. The audio was deleted; record again to retry." });
       } else if (job.providerJobId) {
         await ctx.db.patch(job._id, { updatedAt: Date.now() });
         await ctx.scheduler.runAfter(0, pollBatchRef, { jobId: job._id, generation: job.generation ?? 0, attempt: 0 });
       } else if ((job.attempts ?? 0) < MAX_ATTEMPTS && chunk.storageId && chunk.expiresAt > Date.now()) {
         await ctx.db.patch(job._id, { state: "queued", error: "A stalled transcription will be retried.", updatedAt: Date.now() });
         await ctx.db.patch(chunk._id, { state: "queued" });
-        await ctx.db.patch(conversation._id, { state: "queued", summary: "Transcription stalled and has been queued for another attempt. Speakers remain unnamed." });
+        if (!conversation.sessionId) await ctx.db.patch(conversation._id, { state: "queued", summary: "Transcription stalled and has been queued for another attempt. Speakers remain unnamed." });
         await ctx.scheduler.runAfter(0, transcribeRef, { jobId: job._id });
       } else {
         const now = Date.now();
@@ -323,8 +340,15 @@ export const recoverStale = internalMutation({
         await ctx.db.patch(chunk._id, { state: "failed" });
         await deleteTemporaryAudio(ctx, chunk._id, chunk.storageId);
         await failSpeakerJob(ctx, job.chunkId, now, "Transcription failed; temporary audio was deleted.");
-        await ctx.db.patch(conversation._id, { state: "failed", summary: "A transcript could not be prepared. The temporary audio was deleted; record again to retry." });
+        if (conversation.sessionId) await settleLiveChunk(ctx, conversation, "failed");
+        else await ctx.db.patch(conversation._id, { state: "failed", summary: "A transcript could not be prepared. The temporary audio was deleted; record again to retry." });
       }
+    }
+    const abandoned = await ctx.db.query("recordingSessions")
+      .withIndex("by_continuous_state_lastChunkAt", (q) => q.eq("continuous", true).eq("state", "recording").lt("lastChunkAt", Date.now() - 10 * 60_000)).take(25);
+    for (const session of abandoned) {
+      await ctx.db.patch(session._id, { state: "stopped", endedAt: Date.now() });
+      if (session.conversationId) await refreshLiveConversation(ctx, session.conversationId);
     }
     return stale.length;
   },

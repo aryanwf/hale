@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 
 const require = createRequire(import.meta.url);
 assert.equal(require("react-dom/package.json").version, require("react/package.json").version, "Clerk needs React DOM to match the mobile React version, not the web workspace version.");
@@ -25,4 +26,11 @@ const service = application.service.find((entry) => entry.$["android:name"] === 
 assert(service, "Android microphone capture needs the native recording service.");
 assert.equal(service.$["android:foregroundServiceType"], "microphone");
 assert.equal(service.$["android:exported"], "false");
-console.log("Android target, keyboard resizing, camera and microphone permissions, private storage, and foreground service verified.");
+const liveManifest = readFileSync(new URL("../modules/hale-capture/android/src/main/AndroidManifest.xml", import.meta.url), "utf8");
+assert(liveManifest.includes('android:name="health.hale.capture.HaleCaptureService"'));
+assert(liveManifest.includes('android:foregroundServiceType="microphone"'));
+assert(liveManifest.includes('android:exported="false"'));
+assert(liveManifest.includes('android.permission.WAKE_LOCK'));
+const moduleConfig = JSON.parse(readFileSync(new URL("../modules/hale-capture/expo-module.config.json", import.meta.url), "utf8"));
+assert(moduleConfig.android.modules.includes("health.hale.capture.HaleCaptureModule"));
+console.log("Android permissions, private storage, Expo audio, and the local continuous microphone service verified.");

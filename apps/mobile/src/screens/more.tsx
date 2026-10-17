@@ -28,7 +28,7 @@ export function MoreScreen() {
         <Text style={styles.small}>{mode === "demo" ? "Demo profile · no real voiceprint" : person.enrollment === "enrolled" ? "Voice enrolled with consent" : person.enrollment === "revoked" ? "Voice enrollment revoked" : "Voice not enrolled"}</Text>
         <Text style={styles.small}>{space.conversations.filter((item) => item.people.includes(person.id)).length} linked conversations</Text>
       </View>) : <Empty title="No people added yet" description="People will appear here when patient-space profiles are available." />}
-      <Notice>People profiles do not grant account access or prove who was physically present. Voice matching is not connected yet.</Notice>
+      <Notice>People profiles do not grant account access or prove who was physically present. In live mode, only selected, consented profiles are checked; uncertain speakers remain unknown.</Notice>
       <Button title="Manage my voice profile on the web" tone="secondary" onPress={openVoiceProfile} />
     </View>
 
@@ -44,13 +44,13 @@ export function MoreScreen() {
     <View style={styles.card}>
       <Text style={styles.eyebrow}>DATA AND PRIVACY</Text>
       <Text style={styles.heading}>What Hale stores</Text>
-      <Text style={styles.small}>Uploaded audio · up to 7 days</Text>
-      <Text style={styles.small}>Transcripts and memories · until you delete the conversation</Text>
-      <Text style={styles.small}>Unsent audio · up to 3 files on this device</Text>
+       <Text style={styles.small}>Uploaded audio · temporary for transcription and selected speaker matching, then deleted; stalled processing expires in about 24 hours</Text>
+       <Text style={styles.small}>Transcripts and memories · until you delete the conversation</Text>
+       <Text style={styles.small}>Unsent temporary audio · up to 3 files on this device until upload or discard</Text>
       <View style={styles.divider} />
       <Text style={styles.small}>{pending.length} saved locally for this account and patient space.</Text>
       <Text style={styles.small}>Local audio is not app-encrypted. Uninstalling Hale or clearing app data removes unsent files. An interrupted file may be incomplete.</Text>
-      <Text style={styles.small}>Cloud processing is not end-to-end encrypted. Deleting audio from Hale does not delete a provider’s independent records.</Text>
+       <Text style={styles.small}>Cloud processing is not end-to-end encrypted. Providers receive audio to perform transcription and optional speaker matching; their independent retention is governed by their terms.</Text>
     </View>
 
     <View style={styles.card}>
@@ -68,6 +68,6 @@ export function MoreScreen() {
     </View>}
 
     <Button title={mode === "demo" ? "Reset demo" : "Sign out"} tone="secondary" disabled={busy} onPress={() => Alert.alert(mode === "demo" ? "Reset demo data?" : "Sign out?", "Unsent recordings stay on this device. Discard local files first if this device is shared.", [{ text: "Cancel", style: "cancel" }, { text: "Continue", onPress: () => { void signOut().catch(() => Alert.alert("Couldn’t sign out", "Please try again.")); } }])} />
-    <Notice>Use fictional names and consented test audio only. Transcription, memory extraction, speaker matching, and summaries are not connected yet.</Notice>
+    <Notice>Use fictional names and consented test audio only. Live audio is transcribed and temporary files are deleted after processing. Memory extraction and summaries are still under development.</Notice>
   </Page>;
 }

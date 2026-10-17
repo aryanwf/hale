@@ -125,7 +125,7 @@ For live mode, set in `apps/mobile/.env.local`:
 
 Enable Clerk’s **Native API** under Dashboard → Native applications. The native sign-in/sign-up UI uses enabled instance factors and supports session tasks; it is a beta SDK surface. Keep the existing `convex` JWT template and deployment issuer configuration. Tokens persist using Clerk’s SecureStore token cache. A physical device cannot reach your computer’s `localhost`; use a reachable web URL. No patient API or AI-provider secret belongs in an `EXPO_PUBLIC_*` variable.
 
-Live mode never substitutes demo data for a connection or authorization failure. Patient creation, account memberships, capability checks, searches, source-bound recall, audio playback, and evidence deletion use the same backend as the web dashboard. Apply the accompanying Convex changes to your chosen development deployment before testing native uploads. Native requests omit `Origin` but must pass bearer authentication, session ownership, membership, and recording consent checks. Arbitrary browser origins remain rejected.
+Live mode never substitutes demo data for a connection or authorization failure. Patient creation, account memberships, capability checks, searches, source-bound recall, transcript access, and evidence deletion use the same backend as the web dashboard. Apply the accompanying Convex changes to your chosen development deployment before testing native uploads. Native requests omit `Origin` but must pass bearer authentication, session ownership, membership, and recording consent checks. Arbitrary browser origins remain rejected.
 
 ## Patient features
 
@@ -133,7 +133,7 @@ Live mode never substitutes demo data for a connection or authorization failure.
 - **Memories:** patient-timezone day navigation, date selection, conversation/transcript search, linked source records, bounded-result notices.
 - **Ask Hale:** source-bound text recall, original transcript citations and audio offsets, scoped-day questions, honest abstention. Questions are not stored as evidence.
 - **Care:** the same explicitly disconnected ride/calendar/medication integrations as the web app, with labeled demo quotes and confirmed fictional self-reports. No live booking or dosing advice.
-- **Your space:** people, enrollment status, patient switching, voice-profile handoff to the web, retention, privacy, and sign-out.
+- **Your space:** people, enrollment status, patient switching, voice-profile handoff to the web, privacy, and sign-out.
 
 Geist is used for the UI, Libre Baskerville for editorial headings, and IBM Plex Mono for metadata. Fonts ship with the app. The warm neutral/burgundy palette is centralized in `src/theme.ts`.
 
@@ -142,15 +142,15 @@ Geist is used for the UI, Libre Baskerville for editorial headings, and IBM Plex
 Both `enableBackgroundRecording` in the native config plugin and `allowsBackgroundRecording` at runtime are required. The app starts capture only after an explicit tap while foregrounded and participant consent. Native audio capture—not a JavaScript timer—continues while the screen is locked or the app is backgrounded.
 
 - **Android:** Expo’s microphone foreground service and OS recording indicator/stop action. This installed `expo-audio` version requires notification permission on Android 13+ before preparing background capture. Hale requests microphone access first, then notifications; denial blocks recording with a settings explanation rather than silently dropping the foreground service.
-- The recorder is above tab navigation, so moving between dashboard screens does not stop capture. Playback is disabled while capturing.
+- The recorder is above tab navigation, so moving between dashboard screens does not stop capture. Original-audio playback is not retained in Hale.
 - Native `forDuration` stops each file at one hour, even when JavaScript is suspended. Mono AAC targets 24 kbps/24 kHz; the server additionally rejects files over 20 MB. Web sessions keep their existing two-minute limit.
 - Pause finalizes a file and session. Resume starts a fresh segment; pause gaps are not represented as recorded audio.
 - Files are written directly into app documents. A small journal records ownership, patient space, session ID, URI, timestamps, and last measured native duration. At most three local files may be queued across accounts/spaces.
-- Capture and uploads are separate: review, upload/retry, or discard saved files from Today. Uploads use stable `(sessionId, sequence=0)` idempotency keys. Successful uploads remove local queue entries and files; failures preserve audio. Pending audio is visible only to its owning account and patient space. Sign back into that account/space to clear its queue.
+- Capture files are temporary local upload buffers, not saved recordings. Live mode uploads them for transcription after each segment ends, then removes the local copy once the server accepts it. Failed uploads remain in the private app queue for retry or discard. Uploads use stable `(sessionId, sequence=0)` idempotency keys. Pending audio is visible only to its owning account and patient space. Sign back into that account/space to clear its queue.
 - Calls, route changes, native errors, OS battery policies, force-stop, and termination can interrupt capture. There is no automatic restart. After restart, journal recovery uses the last measured duration; final audio may be incomplete or unplayable. Recovery is best effort, not guaranteed coverage.
 - Local files are sandboxed, **not application-encrypted**. Android app backup is disabled. Uninstalling or clearing app data destroys unsent audio. Do not use real patient data in this prototype.
 
-Audio uploads still appear as **queued**: transcription, extraction, speaker matching, and nightly summaries are not connected in the current backend. The mobile app does not invent them.
+Live uploads now run through Sarvam Saaras v4 transcription (REST for clips up to 30 seconds, batch for longer clips up to two hours). Selected, consented voice profiles can be matched with pyannote; uncertain or unselected voices remain unknown. Hale deletes the uploaded audio after transcription and any matching, or after a 24-hour fallback TTL if processing stalls. Transcripts remain until the conversation is deleted. Provider processing and independent retention are governed by provider terms. Memory extraction and nightly summaries are not connected yet.
 
 ## Verification
 
@@ -167,9 +167,9 @@ Before claiming on-device background support is verified, use consented test aud
 2. Speak, switch tabs/apps, lock the screen for at least 3 minutes, then return. Verify native duration and recorded audio include the locked-screen speech.
 3. Pause, wait, resume, then stop. Confirm separate files, no silently restarted capture, and no pause-gap audio claim.
 4. Test an incoming call, route/headphone changes, denied microphone/notification permission, Android notification stop, and battery restrictions. Confirm truthful denial/interruption state.
-5. Save offline, restart the app, review retained audio, reconnect, and explicitly upload. Retry after a simulated failed response; verify only one server conversation is created per file.
+5. Save offline, restart the app, reconnect, and upload the temporary local clip. Retry after a simulated failed response; verify only one server conversation is created per file and the local file is removed after server acceptance.
 6. Sign in/out, restart, and switch patient spaces. Confirm session persistence, disabled switching during capture, and account/patient isolation of queued files.
-7. Test deletion, consent revocation, expired playback links, empty search results, and source citations.
+7. Test deletion, consent revocation during matching, temporary audio expiry, empty search results, and source citations.
 8. Test the one-hour native stop while locked; verify media duration and accepted upload size.
 9. Stop and save audio, edit a screen label, and confirm Fast Refresh updates the phone. Then fully reload/restart and confirm durable queued audio remains available.
 

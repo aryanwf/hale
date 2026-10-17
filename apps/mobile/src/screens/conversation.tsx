@@ -1,6 +1,5 @@
-import { Component, useEffect, useState, type ReactNode } from "react";
+import { Component, useState, type ReactNode } from "react";
 import { Alert, Text, View } from "react-native";
-import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { useQuery } from "convex/react";
 import { api } from "@hale/contracts/api";
 import type { Conversation, Memory, TranscriptTurn } from "@hale/contracts";
@@ -10,7 +9,7 @@ import { useWorkspace } from "../providers/workspace";
 import { useCapture } from "../providers/capture";
 import { styles } from "../theme";
 
-interface Detail { patientId: string; conversation: Conversation; memories: Memory[]; turns: TranscriptTurn[]; audioUrl: string | null }
+interface Detail { patientId: string; conversation: Conversation; memories: Memory[]; turns: TranscriptTurn[] }
 class SourceBoundary extends Component<{ children: ReactNode; back(): void }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
@@ -18,20 +17,9 @@ class SourceBoundary extends Component<{ children: ReactNode; back(): void }, { 
     return this.state.failed ? <Page eyebrow="SOURCE UNAVAILABLE" title="This memory has changed."><Notice>The source was deleted, your access changed, or your connection needs attention. No replacement evidence has been invented.</Notice><Button title="Go back" onPress={this.props.back} /></Page> : this.props.children;
   }
 }
-function AudioPlayback({ url, timestamp }: { url: string; timestamp: number }) {
-  const { phase } = useCapture();
-  const player = useAudioPlayer(url);
-  const status = useAudioPlayerStatus(player);
-  const capturing = ["starting", "recording", "saving"].includes(phase);
-  useEffect(() => { if (capturing) player.pause(); }, [capturing, player]);
-  return <View style={styles.stack}><Text style={styles.mono}>{durationLabel(status.currentTime)} / {durationLabel(status.duration)}</Text><Button title={status.playing ? "Pause audio" : timestamp > 0 ? `Play from ${durationLabel(timestamp)}` : "Play original audio"} disabled={capturing || !status.isLoaded} onPress={() => {
-    if (status.playing) { player.pause(); return; }
-    void player.seekTo(timestamp).then(() => player.play()).catch(() => Alert.alert("Audio unavailable", "The audio may have expired. Reopen the conversation to refresh its link."));
-  }} />{capturing && <Text style={styles.small}>Stop microphone capture before playing audio.</Text>}</View>;
-}
 function DetailBody({ detail, timestamp, back }: { detail: Detail; timestamp: number; back(): void }) {
   const workspace = useWorkspace();
-  const { conversation, turns, audioUrl } = detail;
+  const { conversation, turns } = detail;
   const [busy, setBusy] = useState(false);
   const { phase, pending, uploading } = useCapture();
   const processingLabel = { queued: "Queued", processing: "Processing", ready: "Ready", failed: "Could not process" }[conversation.state];
@@ -43,7 +31,7 @@ function DetailBody({ detail, timestamp, back }: { detail: Detail; timestamp: nu
   }
   return <Page eyebrow="THE ORIGINAL WORDS" title={conversation.title} description={conversation.summary}>
     <Text style={styles.eyebrow}>{conversation.synthetic ? "FICTIONAL DEMO" : processingLabel} · {durationLabel(conversation.duration)}</Text>
-    {audioUrl ? <AudioPlayback url={audioUrl} timestamp={timestamp} /> : <Notice>{conversation.synthetic ? "No real audio is attached to fictional conversations." : "Audio playback is unavailable or has expired. Cloud audio is retained for up to 7 days."}</Notice>}
+    <Notice>{conversation.synthetic ? "No real audio is attached to fictional conversations." : "Hale deletes temporary audio after transcription and any selected speaker matching. Only transcript text remains until you delete it; processing providers receive audio to perform these tasks."}</Notice>
     <Text style={styles.heading}>Conversation transcript</Text>
     {turns.length ? turns.map((turn) => <View key={turn.id} style={[styles.card, timestamp >= turn.start && timestamp < turn.end && styles.cream]}><Text style={styles.eyebrow}>{durationLabel(turn.start)} · {turn.uncertain ? "Speaker uncertain" : turn.speaker}</Text><Text style={styles.body}>{turn.text}</Text></View>) : <Empty title={conversation.state === "queued" ? "Transcript queued" : conversation.state === "processing" ? "Transcript processing" : conversation.state === "failed" ? "Transcript unavailable" : "No transcript available"} description={conversation.state === "queued" ? "The audio is queued for processing. No transcript text or speaker names are invented." : conversation.state === "processing" ? "The audio is still processing. Check back when it is ready." : conversation.state === "failed" ? "Processing did not complete. No transcript is available." : "No transcript is available for this conversation."} />}
     <Notice>Recorded statements are not verified events. A plan does not establish that something happened, and a speaker label is not proof of someone’s presence.</Notice>
@@ -63,7 +51,7 @@ function ConversationContents({ id, timestamp = 0, back }: { id: string; timesta
   if (mode === "live") return <LiveConversation id={id} timestamp={timestamp} back={back} />;
   const conversation = space.conversations.find((item) => item.id === id);
   if (!conversation) return <Page eyebrow="SOURCE UNAVAILABLE" title="This memory has changed."><Notice>The original conversation may have been deleted. Ask again to use the remaining evidence.</Notice><Button title="Go back" onPress={back} /></Page>;
-  return <DetailBody detail={{ patientId: space.id, conversation, turns: conversation.turns, memories: [], audioUrl: null }} timestamp={timestamp} back={back} />;
+  return <DetailBody detail={{ patientId: space.id, conversation, turns: conversation.turns, memories: [] }} timestamp={timestamp} back={back} />;
 }
 
 export function ConversationScreen(props: { id: string; timestamp?: number; back(): void }) {

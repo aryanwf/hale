@@ -182,8 +182,11 @@ export const poll = internalAction({
       if (result.status === "succeeded") {
         const output = asRecord(result.output);
         const voiceprint = output?.voiceprint;
-        if (output?.error || output?.warning || typeof voiceprint !== "string" || !voiceprint.length || voiceprint.length > 200_000) {
-          await ctx.runMutation(finishRef, { ...args, message: "This sample needs another take. Use a quiet room and only your own voice." });
+        const providerError = output?.error !== undefined && output.error !== null && output.error !== "";
+        const usableVoiceprint = typeof voiceprint === "string" && voiceprint.trim().length > 0 && voiceprint.length <= 200_000;
+        // pyannote warnings are advisory; reject explicit errors or missing/invalid output, not a usable voiceprint with a warning.
+        if (providerError || !usableVoiceprint) {
+          await ctx.runMutation(finishRef, { ...args, message: "This take did not produce a usable voice profile. If you can clearly hear only your own voice, try once more or skip setup and try later." });
         } else await ctx.runMutation(finishRef, { ...args, voiceprint });
         return;
       }

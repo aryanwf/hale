@@ -17,7 +17,7 @@ export function AuthShell({ children, signup = false, step = 0 }: { children: Re
     <div className="auth-content">
       <header className="auth-header"><Link className="wordmark auth-mobile-brand" href="/"><Leaf size={22} />hale.</Link><p>{signup ? "Already part of the circle?" : "New to Hale?"} <Link href={signup ? "/login" : "/signup"}>{signup ? "Log in" : "Join us"}<ArrowUpRight size={14} /></Link></p></header>
       <main id="auth-main" className="auth-main">
-        {signup && <ol className="auth-steps" aria-label="Signup progress">{["Family account", "Family code", "Connect Android"].map((label, index) => <li key={label} aria-current={step === index ? "step" : undefined} className={index <= step ? "is-active" : ""}><span>{index < step ? <Check size={12} /> : `0${index + 1}`}</span>{label}</li>)}</ol>}
+        {signup && <ol className="auth-steps" aria-label="Signup progress">{["Family account", "Family code", "Connect Android", "Voice profile"].map((label, index) => <li key={label} aria-current={step === index ? "step" : undefined} className={index <= step ? "is-active" : ""}><span>{index < step ? <Check size={12} /> : `0${index + 1}`}</span>{label}</li>)}</ol>}
         {children}
       </main>
       <footer className="auth-footer"><span>YOUR MEMORIES, ALWAYS WITHIN REACH.</span><p>A personal memory aid. Not a medical service.</p></footer>

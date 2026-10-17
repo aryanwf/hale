@@ -371,6 +371,9 @@ svg { flex-shrink: 0; vertical-align: middle; }
 .recorder-card-head p { font-size: 13px; color: var(--muted); margin-top: 5px; }
 .recording-consent { margin: 24px 0; font-size: 14px; line-height: 1.65; }
 .recording-consent input { width: 21px; height: 21px; min-width: 21px; }
+.expected-speakers { border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; margin: 0 0 18px; display: grid; gap: 10px; }
+.expected-speakers legend { padding: 0 6px; font-size: 13px; font-weight: 500; }
+.expected-speakers .small { margin: 0; }
 .recording-actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
 .recording-actions .btn { min-height: 50px; font-size: 15px; padding: 12px 24px; }
 .recording-actions > .btn:first-child:last-child { width: 100%; }

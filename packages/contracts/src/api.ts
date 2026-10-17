@@ -20,8 +20,8 @@ export const api = {
   space: makeFunctionReference<"query", { patientId: string }, PatientSpace>("conversations:space"),
   searchConversations: makeFunctionReference<"query", { patientId: string; text: string; day?: string; personId?: string }, { conversations: Conversation[]; limited: boolean }>("conversations:search"),
   recall: makeFunctionReference<"query", { patientId: string; question: string; day?: string }, RecallAnswer>("assistant:recall"),
-  detail: makeFunctionReference<"query", { conversationId: string }, { patientId: string; conversation: Conversation; memories: Memory[]; turns: TranscriptTurn[]; audioUrl: string | null }>("conversations:detail"),
+  detail: makeFunctionReference<"query", { conversationId: string }, { patientId: string; conversation: Conversation; memories: Memory[]; turns: TranscriptTurn[] }>("conversations:detail"),
   deleteConversation: makeFunctionReference<"mutation", { conversationId: string }, null>("privacy:deleteConversation"),
-  startRecording: makeFunctionReference<"mutation", { patientId: string; participantsConsented: boolean; captureMode?: "native" | "web" }, string>("recordings:start"),
+  startRecording: makeFunctionReference<"mutation", { patientId: string; participantsConsented: boolean; captureMode?: "native" | "web"; expectedPeople?: string[] }, string>("recordings:start"),
   recordingState: makeFunctionReference<"mutation", { sessionId: string; state: "recording" | "paused" | "interrupted" | "stopped" }, null>("recordings:setState"),
 };

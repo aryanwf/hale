@@ -37,7 +37,8 @@ export interface CaptureDevice {
 export interface CaptureBackend {
   owner: string;
   patientId: string;
-  beginSession(): Promise<string>;
+  autoUploadOnStop?: boolean;
+  beginSession(expectedPeople: string[]): Promise<string>;
   endSession(sessionId: string): Promise<void>;
   upload(recording: LocalRecording): Promise<void>;
 }
@@ -65,7 +66,7 @@ export class CaptureController {
       ...record, endedAt: record.capturedAt + Math.min(record.durationMs, MAX_NATIVE_RECORDING_SECONDS * 1000),
     });
     if (recovered.length) dependencies.store.save(this.records);
-    this.update(recovered.length ? { message: "A previous recording was interrupted. Review the saved audio before retrying. Recovery uses the last measured duration; the final seconds may be missing." } : {});
+    this.update(recovered.length ? { message: "A previous recording was interrupted. Its temporary clip is ready to upload or discard. Recovery uses the last measured duration; the final seconds may be missing." } : {});
   }
 
   subscribe = (listener: () => void) => {
@@ -82,10 +83,10 @@ export class CaptureController {
 
   private persist() { this.dependencies.store.save(this.records); }
 
-  start = async (consented: boolean) => {
+  start = async (consented: boolean, expectedPeople: string[] = []) => {
     if (this.disposed || this.busy || this.active || this.snapshot.uploading) return;
     if (!consented) { this.update({ message: "Everyone taking part must agree before recording." }); return; }
-    if (this.records.length >= MAX_PENDING_RECORDINGS) { this.update({ message: "Your local queue is full. Upload or discard a saved recording first." }); return; }
+    if (this.records.length >= MAX_PENDING_RECORDINGS) { this.update({ message: "Your temporary upload queue is full. Upload or discard a clip before recording more." }); return; }
     this.busy = true;
     this.update({ phase: "starting", message: "" });
     let sessionId: string | undefined;
@@ -93,7 +94,7 @@ export class CaptureController {
     try {
       uri = await this.dependencies.device.prepare();
       if (this.disposed) throw new Error("Hale closed before recording could start.");
-      sessionId = await this.dependencies.backend.beginSession();
+      sessionId = await this.dependencies.backend.beginSession(expectedPeople);
       if (this.disposed) throw new Error("Hale closed before recording could start.");
       const capturedAt = Date.now();
       const { owner, patientId } = this.dependencies.backend;
@@ -147,7 +148,7 @@ export class CaptureController {
       // Each pause closes a file/session, so pause gaps never become source audio timestamps.
       recording.endedAt = recording.capturedAt + recording.durationMs;
       this.persist();
-      this.update({ phase, message: message || "Saved on this device. Upload when you’re ready. Transcription is not connected yet." });
+       this.update({ phase, message: message || "Recording finalized. Uploading the temporary clip for transcription…" });
     } catch {
       this.update({ phase: "interrupted", message: this.active ? "Couldn’t stop the microphone. Tap Stop to retry; don’t close Hale." : "The microphone is off, but the file could not be verified or saved completely. Review, retry upload, or discard it; don’t clear app data." });
     } finally {
@@ -157,6 +158,7 @@ export class CaptureController {
       }
       this.busy = false;
     }
+    if (this.dependencies.backend.autoUploadOnStop && this.snapshot.pending.length) void this.retry();
   }
 
   retry = async () => {
@@ -167,19 +169,19 @@ export class CaptureController {
         recording.durationMs = await this.dependencies.device.measureDuration(recording.uri);
         recording.endedAt = recording.capturedAt + recording.durationMs;
         this.persist();
-        if (!uploadableRecording(recording, this.dependencies.store.fileSize(recording.uri))) throw new Error("This file is empty, incomplete, or exceeds the one-hour/20 MB limit. It remains on this device; review or discard it.");
+        if (!uploadableRecording(recording, this.dependencies.store.fileSize(recording.uri))) throw new Error("This clip is empty, incomplete, or exceeds the one-hour/20 MB limit. Its temporary local copy remains here; discard it if you don’t want to retry.");
         await this.dependencies.backend.upload(recording);
         await this.dependencies.backend.endSession(recording.sessionId);
-        // Commit removal before deleting bytes; a failed upload never destroys local evidence.
+        // Commit removal before deleting bytes; an upload failure keeps its temporary retry copy.
         const remaining = this.records.filter((record) => record.id !== recording.id);
         this.dependencies.store.save(remaining);
         this.records = remaining;
         this.dependencies.store.removeFile(recording.uri);
         this.update({});
       }
-      this.update({ message: "Audio uploaded. It will appear as queued; no transcript has been generated yet." });
+      this.update({ message: "Uploaded for transcription. Hale deletes the temporary server copy after transcription and any selected speaker matching." });
     } catch (error) {
-      this.update({ message: error instanceof Error ? error.message : "Upload failed. Your audio remains on this device." });
+      this.update({ message: error instanceof Error ? error.message : "Upload failed. The temporary local clip remains here until retry or discard." });
     } finally { this.update({ uploading: false }); }
   };
 
@@ -194,7 +196,7 @@ export class CaptureController {
       this.dependencies.store.removeFile(recording.uri);
     } catch { this.update({ message: "Couldn’t discard this file. Check device storage and try again." }); return; }
     void this.dependencies.backend.endSession(recording.sessionId).catch(() => {});
-    this.update({ message: "Local audio discarded. This does not delete audio already uploaded." });
+    this.update({ message: "Temporary local audio discarded. Previously uploaded transcript text is unaffected." });
   };
 
   dispose = () => {

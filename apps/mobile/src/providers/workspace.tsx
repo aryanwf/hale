@@ -25,7 +25,7 @@ export interface Workspace {
   patients: PatientInfo[];
   selectPatient(id: string): void;
   signOut(): Promise<void>;
-  beginSession(): Promise<string>;
+  beginSession(expectedPeople: string[]): Promise<string>;
   endSession(sessionId: string): Promise<void>;
   upload(recording: LocalRecording): Promise<void>;
   removeConversation(id: string): Promise<void>;
@@ -64,7 +64,7 @@ function PatientWorkspace({ patientId, patients, selectPatient, children }: { pa
   return <Context.Provider value={{
     mode: "live", owner: userId, space, patients, selectPatient, today,
     signOut: async () => { await signOut(); },
-    beginSession: () => begin({ patientId, participantsConsented: true, captureMode: "native" }),
+    beginSession: (expectedPeople) => begin({ patientId, participantsConsented: true, captureMode: "native", expectedPeople }),
     endSession: (sessionId) => state({ sessionId, state: "stopped" }).then(() => {}),
     upload: async (recording) => {
       if (recording.owner !== userId || recording.patientId !== patientId) throw new Error("This recording belongs to a different account or patient space.");
@@ -94,7 +94,7 @@ function Onboarding({ onCreated }: { onCreated(patientId: string): void }) {
     catch { Alert.alert("Couldn’t create your space", "Check your name, timezone, and connection, then try again."); }
     finally { setBusy(false); }
   }
-  return <Gate title="A little introduction." description="Create your own patient space. Use a fictional name and consented test audio in this prototype."><Field label="Your display name" value={name} onChangeText={setName} maxLength={100} /><Field label="Patient timezone" value={timezone} onChangeText={setTimezone} autoCapitalize="none" /><Notice>Audio expires after 7 days on the server. Transcripts remain until you delete the conversation. Cloud processing is not end-to-end encrypted. This is a memory aid, not a medical service.</Notice><Check checked={consent} onChange={() => setConsent(!consent)}>I understand the processing and consent to test recordings. Everyone in each conversation must also agree.</Check><Button title={busy ? "Creating…" : "Create my space"} disabled={busy || name.trim().length < 2 || !consent} onPress={() => void submit()} /><Button title="Sign out" tone="secondary" onPress={() => void signOut()} /></Gate>;
+  return <Gate title="A little introduction." description="Create your own patient space. Use a fictional name and consented test audio in this prototype."><Field label="Your display name" value={name} onChangeText={setName} maxLength={100} /><Field label="Patient timezone" value={timezone} onChangeText={setTimezone} autoCapitalize="none" /><Notice>Audio is uploaded temporarily for transcription and optional speaker matching, then deleted by Hale. If processing stalls, its server copy expires in about 24 hours. Transcript text remains until you delete the conversation. Cloud processing is not end-to-end encrypted.</Notice><Check checked={consent} onChange={() => setConsent(!consent)}>I understand the processing and consent to test recordings. Everyone in each conversation must also agree.</Check><Button title={busy ? "Creating…" : "Create my space"} disabled={busy || name.trim().length < 2 || !consent} onPress={() => void submit()} /><Button title="Sign out" tone="secondary" onPress={() => void signOut()} /></Gate>;
 }
 
 function LiveGate({ children }: { children: ReactNode }) {

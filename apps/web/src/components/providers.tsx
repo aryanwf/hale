@@ -23,7 +23,7 @@ interface Workspace {
   deleteConversation: (id: string) => Promise<void>;
   resetDemo?: () => void;
   account: ReactNode;
-  beginSession: () => Promise<string>;
+  beginSession: (expectedPeople: string[]) => Promise<string>;
   setSessionState: (id: string, state: "recording" | "paused" | "interrupted" | "stopped") => Promise<void>;
   uploadSegment: (sessionId: string, segment: SegmentUpload) => Promise<void>;
 }
@@ -61,7 +61,7 @@ function LiveSpace({ patientId, patients, selectPatient, children }: { patientId
     mode: "live", space, today: localDate(new Date(), space.timezone), patients, selectPatient,
     account: <UserButton />,
     deleteConversation: async (conversationId) => { await remove({ conversationId }); },
-    beginSession: () => begin({ patientId, participantsConsented: true }),
+    beginSession: (expectedPeople) => begin({ patientId, participantsConsented: true, expectedPeople }),
     setSessionState: async (sessionId, state) => { await setState({ sessionId, state }); },
     uploadSegment: async (sessionId, segment) => {
       const token = await getToken({ template: "convex" });

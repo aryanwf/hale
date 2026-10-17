@@ -100,7 +100,6 @@ function LiveGate({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, signOut } = useAuth({ treatPendingAsSignedOut: false });
   const { isAuthenticated, isLoading } = useConvexAuth();
   const patients = useQuery(api.patients, isAuthenticated ? {} : "skip");
-  const family = useQuery(api.voiceProfile, isAuthenticated ? {} : "skip");
   const [selected, selectPatient] = useState<string>();
   const [authOpen, setAuthOpen] = useState(false);
   let content: ReactNode;
@@ -108,8 +107,7 @@ function LiveGate({ children }: { children: ReactNode }) {
   else if (!isSignedIn) content = <Gate title="Your memories.\nYour space." description="A familiar moment is never far away. Sign in with the same account you use on Hale."><Button title="Sign in or create an account" onPress={() => setAuthOpen(true)} /><Notice>Private memories are only available to accounts you authorize.</Notice></Gate>;
   else if (isLoading) content = <Loading message="Connecting securely…" />;
   else if (!isAuthenticated) content = <Gate title="Your connection needs attention." description="Check the Clerk convex JWT template and Convex issuer configuration."><Button title="Sign out and try again" onPress={() => void signOut()} /></Gate>;
-  else if (!patients || !family) content = <Loading />;
-  else if (!patients.length && family.profile) content = <Gate title="You’re part of the circle." description="Your family account needs an active patient-space membership. A voice profile never grants access. Invitations are not connected yet."><Button title="Sign out" onPress={() => void signOut()} /></Gate>;
+  else if (!patients) content = <Loading />;
   else if (!patients.length) content = <Onboarding />;
   else {
     const patientId = patients.find((patient) => patient.id === selected)?.id ?? patients[0].id;

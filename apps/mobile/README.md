@@ -107,6 +107,10 @@ bun run dev:mobile:usb
 
 The APK is debug-signed, includes the native development client and recording service, and targets arm64 phones and x86_64 emulators. **It needs Metro for JavaScript and Fast Refresh; it is not a standalone release.** Installing a differently signed build over an existing app may fail. Do not uninstall or clear app data without first dealing with unsent recordings.
 
+On Windows, `mobile:apk` detects Android Studio's bundled Java runtime and the default SDK under `%LOCALAPPDATA%\Android\Sdk` when `JAVA_HOME` / `ANDROID_HOME` are unset. Explicit environment settings take precedence. The local Expo plugin keeps CMake intermediates under `%TEMP%\opencode\hale-cxx` (isolated by checkout) to avoid Bun dependency paths exceeding Windows Ninja limits; this configuration survives prebuild.
+
+The Android network dependency plugin aligns OkHttp modules with the 5.4.0 BOM required by the native Clerk SDK. React Native's older `okhttp-urlconnection` otherwise resolves alongside OkHttp 5 and crashes while reading cookies (`NoClassDefFoundError: okhttp3.internal.Util`). Keep the BOM aligned with Clerk when updating native dependencies, and rebuild/reinstall the APK after changing it; Metro cannot update native libraries.
+
 `.github/workflows/android-development.yml` offers the same APK build on a standard **Linux** GitHub runner, with manual dispatch only, a 45-minute job limit, fictional demo mode, and three-day artifact retention. Once the workflow is on the repository’s default branch, use Actions → Build Android development APK → Run workflow. Private repositories consume the owner’s Actions allowance and may incur charges beyond it. No cloud build is automatically started by these local commands.
 
 EAS is optional: `development` produces an APK with a development client, `preview` produces a standalone APK without Fast Refresh, and `production` produces a Play Store app bundle. EAS cloud usage has separate account/quota requirements.

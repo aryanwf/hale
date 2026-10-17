@@ -28,6 +28,7 @@ playwright-report/
 .next-e2e/
 .expo/
 /apps/mobile/android/
+/apps/mobile/modules/*/android/build/
 /apps/mobile/ios/
 /apps/mobile/dist/
 /apps/mobile/build/

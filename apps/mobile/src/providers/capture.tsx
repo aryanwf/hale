@@ -34,7 +34,8 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     store: createCaptureStore(),
     backend: {
       owner: workspace.owner, patientId: workspace.space.id,
-      beginSession: () => latestWorkspace.current.beginSession(),
+      autoUploadOnStop: workspace.mode === "live",
+      beginSession: (expectedPeople) => latestWorkspace.current.beginSession(expectedPeople),
       endSession: (id) => latestWorkspace.current.endSession(id),
       upload: (recording) => latestWorkspace.current.upload(recording),
     },

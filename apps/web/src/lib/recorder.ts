@@ -23,7 +23,7 @@ export interface CaptureSnapshot {
 
 interface Adapter {
   mode: "demo" | "live";
-  beginSession: () => Promise<string>;
+  beginSession: (expectedPeople: string[]) => Promise<string>;
   setSessionState: (id: string, state: "recording" | "paused" | "interrupted" | "stopped") => Promise<void>;
   uploadSegment: (sessionId: string, segment: SegmentUpload) => Promise<void>;
 }
@@ -56,7 +56,7 @@ export class ForegroundRecorder {
     for (const listener of this.listeners) listener();
   }
 
-  async start() {
+  async start(expectedPeople: string[] = []) {
     if (this.transitioning || ["starting", "recording"].includes(this.snapshot.phase)) return;
     if (this.snapshot.segments.length >= MAX_PENDING_SEGMENTS) { this.update({ message: "Save or discard local segments before recording more." }); return; }
     const attempt = ++this.generation;
@@ -73,7 +73,7 @@ export class ForegroundRecorder {
       }
       this.stream = stream;
       const resuming = !!this.session;
-      const session = this.session ?? await this.adapter.beginSession();
+       const session = this.session ?? await this.adapter.beginSession(expectedPeople);
       if (!this.alive || attempt !== this.generation || document.visibilityState !== "visible") {
         stream.getTracks().forEach((track) => track.stop());
         await this.adapter.setSessionState(session, "stopped").catch(() => {});
@@ -98,7 +98,7 @@ export class ForegroundRecorder {
       }, 1000);
     } catch (error) {
       this.releaseStream();
-      this.update({ phase: "failed", message: error instanceof DOMException && error.name === "NotAllowedError" ? "Microphone access was denied. Allow it in Safari’s website settings, then try again." : error instanceof Error ? error.message : "The microphone couldn’t start. Try again." });
+      this.update({ phase: "failed", message: error instanceof DOMException && error.name === "NotAllowedError" ? "Microphone access was denied. Allow it in your browser’s site settings, then try again." : error instanceof Error ? error.message : "The microphone couldn’t start. Try again." });
     }
   }
 

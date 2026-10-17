@@ -200,5 +200,8 @@ describe("revocation, deletion, and retention", () => {
     await t.mutation(app.internal.privacy.expireAudio);
     expect(await t.run((ctx) => ctx.storage.getUrl(args.storageId))).toBeNull();
     expect((await patient.query(app.api.conversations.space, { patientId })).conversations).toHaveLength(1);
+    const jobs = await t.run((ctx) => ctx.db.query("processingJobs").collect());
+    expect(jobs).toMatchObject([{ state: "failed", error: "Temporary audio expired before transcription completed." }]);
+    expect((await patient.query(app.api.conversations.space, { patientId })).conversations[0]).toMatchObject({ state: "failed" });
   });
 });

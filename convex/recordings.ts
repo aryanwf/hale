@@ -2,7 +2,7 @@ import { makeFunctionReference } from "convex/server";
 import { v, ConvexError } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "./lib/functions";
 import { refreshLiveConversation } from "./lib/liveConversations";
-import { requireMember, requireRecordingConsent } from "./authz";
+import { hasExternalAIConsent, requireMember, requireRecordingConsent } from "./authz";
 import { localDate } from "@hale/contracts/time";
 import { audioDurationLimit } from "@hale/contracts/audio";
 
@@ -17,9 +17,13 @@ export const authorizeUpload = internalQuery({
   handler: async (ctx, { sessionId }) => {
     const session = await ctx.db.get(sessionId);
     if (!session) throw new ConvexError("Session unavailable.");
+    if (session.privacyDeletedAt) throw new ConvexError("This recording session’s data has been deleted.");
+    if (session.consentRevokedAt) throw new ConvexError("Recording consent for this session was withdrawn.");
+    if (session.externalAIRevokedAt) throw new ConvexError("External AI consent for this recording session was withdrawn.");
     const { identity } = await requireMember(ctx, session.patientId, "recordings:create");
     if (identity.subject !== session.subject) throw new ConvexError("Session owner mismatch.");
-    await requireRecordingConsent(ctx, session.patientId, identity.subject);
+    await requireRecordingConsent(ctx, session.patientId, identity.subject, session.consentConfirmedAt);
+    if (!await hasExternalAIConsent(ctx, session.patientId)) throw new ConvexError("Enable external AI processing in Privacy & Security before uploading audio.");
     return null;
   },
 });
@@ -30,6 +34,7 @@ export const start = mutation({
   handler: async (ctx, { patientId, participantsConsented, captureMode, expectedPeople = [], continuous }) => {
     const { identity, patient } = await requireMember(ctx, patientId, "recordings:create");
     await requireRecordingConsent(ctx, patientId, identity.subject);
+    if (!await hasExternalAIConsent(ctx, patientId)) throw new ConvexError("Enable external AI processing in Privacy & Security before starting a recording.");
     if (!participantsConsented) throw new ConvexError("Confirm consent from everyone taking part before recording.");
     if (continuous && (captureMode !== "native" || expectedPeople.length)) throw new ConvexError("Live recording requires the native app. Live speakers remain unnamed.");
     if (expectedPeople.length > 50 || new Set(expectedPeople).size !== expectedPeople.length) throw new ConvexError("Choose up to 50 different people to recognize.");
@@ -49,7 +54,8 @@ export const setState = mutation({
     if (!session) throw new ConvexError("Session unavailable.");
     const { identity } = await requireMember(ctx, session.patientId, "recordings:create");
     if (session.subject !== identity.subject) throw new ConvexError("This session belongs to another user.");
-    await requireRecordingConsent(ctx, session.patientId, identity.subject);
+    await requireRecordingConsent(ctx, session.patientId, identity.subject, session.consentConfirmedAt);
+    if (session.externalAIRevokedAt && state !== "stopped") throw new ConvexError("External AI consent for this recording session was withdrawn.");
     if (session.state === "stopped") {
       if (state === "stopped") return null;
       throw new ConvexError("This session has ended. Start a new one.");
@@ -70,9 +76,13 @@ export const acceptChunk = internalMutation({
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
     if (!session) throw new ConvexError("Session unavailable.");
+    if (session.privacyDeletedAt) throw new ConvexError("This recording session’s data has been deleted.");
+    if (session.consentRevokedAt) throw new ConvexError("Recording consent for this session was withdrawn.");
+    if (session.externalAIRevokedAt) throw new ConvexError("External AI consent for this recording session was withdrawn.");
     const { identity } = await requireMember(ctx, session.patientId, "recordings:create");
     if (identity.subject !== session.subject) throw new ConvexError("Session owner mismatch.");
-    await requireRecordingConsent(ctx, session.patientId, identity.subject);
+    await requireRecordingConsent(ctx, session.patientId, identity.subject, session.consentConfirmedAt);
+    if (!await hasExternalAIConsent(ctx, session.patientId)) throw new ConvexError("External AI processing consent is required before uploading audio.");
     const durationLimit = audioDurationLimit(session.captureMode);
     if (!Number.isInteger(args.sequence) || args.sequence < 0 || !Number.isFinite(args.capturedAt) || !Number.isFinite(args.endedAt) || args.endedAt <= args.capturedAt || args.endedAt - args.capturedAt > durationLimit || args.capturedAt < session.startedAt - 10_000 || args.endedAt > Date.now() + 10_000) throw new ConvexError("Invalid segment timing.");
     if (session.endedAt && args.endedAt > session.endedAt + 1000) throw new ConvexError("This audio was captured after the session ended.");

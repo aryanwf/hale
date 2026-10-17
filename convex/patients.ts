@@ -1,7 +1,7 @@
 import { v, ConvexError } from "convex/values";
 import { PATIENT_CAPABILITIES } from "@hale/contracts";
 import { query, mutation, type QueryCtx } from "./lib/functions";
-import { getAccountStatus, requireIdentity } from "./authz";
+import { EXTERNAL_AI_POLICY_VERSION, getAccountStatus, requireIdentity } from "./authz";
 
 const patientInfoValidator = v.object({
   id: v.id("patients"),
@@ -36,7 +36,7 @@ export const listForRole = query({
 });
 
 export const create = mutation({
-  args: { name: v.string(), timezone: v.string(), recordingConsent: v.boolean() },
+  args: { name: v.string(), timezone: v.string(), recordingConsent: v.boolean(), externalAIConsent: v.optional(v.boolean()) },
   returns: v.id("patients"),
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
@@ -51,7 +51,14 @@ export const create = mutation({
     const patientId = await ctx.db.insert("patients", { name, timezone: args.timezone, createdBy: identity.subject, audioRetentionDays: 0, createdAt: now });
     await ctx.db.insert("memberships", { patientId, subject: identity.subject, role: "patient", capabilities: PATIENT_CAPABILITIES, active: true });
     await ctx.db.insert("people", { patientId, name, relationship: "You · patient", enrollment: "not_enrolled", isPatient: true });
-    if (args.recordingConsent) await ctx.db.insert("consents", { patientId, subject: identity.subject, purpose: "recording", policyVersion: "2026-10-15-v1", grantedAt: now });
+    if (args.recordingConsent) {
+      await ctx.db.insert("consents", { patientId, subject: identity.subject, purpose: "recording", policyVersion: "2026-10-15-v1", grantedAt: now });
+      await ctx.db.insert("auditEvents", { patientId, actor: identity.subject, operation: "privacy.recording_consent.granted", target: patientId, timestamp: now });
+    }
+    if (args.externalAIConsent) {
+      await ctx.db.insert("consents", { patientId, subject: identity.subject, purpose: "external_ai", policyVersion: EXTERNAL_AI_POLICY_VERSION, grantedAt: now });
+      await ctx.db.insert("auditEvents", { patientId, actor: identity.subject, operation: "privacy.external_ai_consent.granted", target: patientId, timestamp: now });
+    }
     await ctx.db.insert("auditEvents", { patientId, actor: identity.subject, operation: "patient.created", target: patientId, timestamp: now });
     return patientId;
   },

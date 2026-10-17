@@ -1,3 +1,4 @@
+import { env } from "../_generated/server";
 import {
   isSarvamLanguageCode,
   supportsSarvamTextToSpeech,
@@ -48,7 +49,7 @@ export type SarvamBatchPollResult =
   | { state: "completed"; transcript: SarvamTranscript };
 
 function apiKey(): string {
-  const key = process.env.SARVAM_API_KEY;
+  const key = env.SARVAM_API_KEY;
   if (!key) throw new Error("Sarvam AI is not configured.");
   return key;
 }

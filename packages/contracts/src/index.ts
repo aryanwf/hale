@@ -9,7 +9,8 @@ export type Capability =
   | "rides:prepare"
   | "appointments:book"
   | "medications:read"
-  | "medications:record";
+  | "medications:record"
+  | "care:manage";
 
 export type MemoryKind = "reported_activity" | "plan" | "personal_fact" | "conversation_topic";
 export type ProcessingState = "queued" | "processing" | "ready" | "failed";
@@ -92,5 +93,5 @@ export const memoryLabels: Record<MemoryKind, string> = {
 
 export const PATIENT_CAPABILITIES: Capability[] = [
   "memories:read", "recordings:create", "evidence:delete", "people:manage",
-  "sharing:manage", "rides:prepare", "appointments:book", "medications:read", "medications:record",
+  "sharing:manage", "rides:prepare", "appointments:book", "medications:read", "medications:record", "care:manage",
 ];

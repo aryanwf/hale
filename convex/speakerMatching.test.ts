@@ -39,7 +39,7 @@ async function setup() {
   tests.push(t);
   const owner = t.withIdentity({ subject: "speaker-owner" });
   const patientId = await owner.mutation(app.api.patients.create, {
-    name: "Fictional Patient", timezone: "UTC", recordingConsent: true,
+    name: "Fictional Patient", timezone: "UTC", recordingConsent: true, externalAIConsent: true,
   });
   const seeded = await t.run(async (ctx) => {
     const now = Date.now();

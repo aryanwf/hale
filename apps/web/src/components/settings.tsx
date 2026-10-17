@@ -25,6 +25,11 @@ export function SettingsView() {
         <div className="settings-option-copy"><h2>What is shared</h2><p>What happens to conversation audio, transcripts, memories, and voice profiles.</p></div>
         <ChevronRight size={19} aria-hidden="true" />
       </Link>
+      <Link className="settings-option" href="/privacy">
+        <span className="settings-option-icon"><ShieldCheck size={20} aria-hidden="true" /></span>
+        <div className="settings-option-copy"><h2>Privacy &amp; security center</h2><p>Review access, consent, retention, access history and authorized data export.</p></div>
+        <ChevronRight size={19} aria-hidden="true" />
+      </Link>
     </nav>
 
     {mode === "demo" && <section className="settings-card settings-demo" aria-labelledby="demo-settings-title">

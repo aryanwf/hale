@@ -17,6 +17,8 @@ export const deleteConversation = mutation({
       await ctx.db.patch(chunk._id, { deletedAt: Date.now(), storageId: undefined, state: "failed" });
       const jobs = await ctx.db.query("processingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", chunk._id)).collect();
       for (const job of jobs) await ctx.db.patch(job._id, { state: "failed", error: "Source deleted.", updatedAt: Date.now() });
+      const speakerJob = await ctx.db.query("speakerMatchingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", chunk._id)).unique();
+      if (speakerJob) await ctx.db.patch(speakerJob._id, { state: "failed", providerJobId: undefined, generation: speakerJob.generation + 1, error: "Source deleted.", updatedAt: Date.now() });
     }
     const turns = await ctx.db.query("transcriptTurns").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).collect();
     const memories = await ctx.db.query("memories").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).collect();
@@ -34,7 +36,43 @@ export const expireAudio = internalMutation({
       .filter((q) => q.neq(q.field("storageId"), undefined)).take(50);
     for (const chunk of chunks) {
       if (chunk.storageId) await ctx.storage.delete(chunk.storageId);
-      await ctx.db.patch(chunk._id, { storageId: undefined });
+      const now = Date.now();
+      await ctx.db.patch(chunk._id, { storageId: undefined, expiresAt: now });
+      const [transcription, speakerJob, conversation] = await Promise.all([
+        ctx.db.query("processingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", chunk._id)).unique(),
+        ctx.db.query("speakerMatchingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", chunk._id)).unique(),
+        ctx.db.query("conversations").withIndex("by_chunk", (q) => q.eq("chunkId", chunk._id)).unique(),
+      ]);
+
+      if (transcription && transcription.state !== "ready" && transcription.state !== "failed") {
+        await ctx.db.patch(transcription._id, {
+          state: "failed", providerJobId: undefined, generation: (transcription.generation ?? 0) + 1,
+          error: "Temporary audio expired before transcription completed.", updatedAt: now,
+        });
+        if (speakerJob && speakerJob.state !== "ready" && speakerJob.state !== "failed" && speakerJob.state !== "skipped") {
+          await ctx.db.patch(speakerJob._id, {
+            state: "failed", providerJobId: undefined, generation: speakerJob.generation + 1,
+            error: "Transcription could not complete before temporary audio expired.", updatedAt: now,
+          });
+        }
+        if (conversation && !conversation.deletedAt) {
+          await ctx.db.patch(conversation._id, {
+            state: "failed", summary: "A transcript could not be prepared before temporary audio expired. The audio was deleted; record again to retry.",
+          });
+        }
+      } else if (transcription?.state === "ready" && speakerJob && speakerJob.state !== "ready" && speakerJob.state !== "failed" && speakerJob.state !== "skipped") {
+        // Keep completed transcript text, but invalidate any late matching result.
+        await ctx.db.patch(speakerJob._id, {
+          state: "failed", providerJobId: undefined, generation: speakerJob.generation + 1,
+          error: "Temporary audio expired before speaker matching completed.", updatedAt: now,
+        });
+        if (conversation && !conversation.deletedAt) {
+          await ctx.db.patch(conversation._id, {
+            state: "ready", people: [],
+            summary: "Transcript prepared. Temporary audio expired before speaker matching completed, so every voice remains unknown.",
+          });
+        }
+      }
     }
   },
 });

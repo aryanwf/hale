@@ -3,6 +3,9 @@ import { ConvexError, v } from "convex/values";
 import { VOICE_POLICY } from "@hale/contracts/voice";
 import { requireIdentity } from "./authz";
 import { internalAction, internalMutation, internalQuery, mutation, query } from "./lib/functions";
+import { pyannoteRequest } from "./lib/pyannote";
+
+const MAX_IDENTIFICATION_VOICEPRINT_CHARACTERS = 20_000;
 
 const startRef = makeFunctionReference<"action">("voices:start");
 const pollRef = makeFunctionReference<"action">("voices:poll");
@@ -138,22 +141,13 @@ export const finish = internalMutation({
     if (!profile || profile.requestId !== args.requestId || profile.voiceState !== "processing" || profile.revokedAt || !profile.consentAt) return;
     if (profile.storageId) await ctx.storage.delete(profile.storageId);
     await ctx.db.patch(profile._id, {
-      voiceState: args.voiceprint ? "enrolled" : "failed", voiceprint: args.voiceprint,
-      message: args.message, storageId: undefined, jobId: undefined, updatedAt: Date.now(),
+      voiceState: args.voiceprint && args.voiceprint.length <= MAX_IDENTIFICATION_VOICEPRINT_CHARACTERS ? "enrolled" : "failed",
+      voiceprint: args.voiceprint && args.voiceprint.length <= MAX_IDENTIFICATION_VOICEPRINT_CHARACTERS ? args.voiceprint : undefined,
+      message: args.message ?? (args.voiceprint && args.voiceprint.length > MAX_IDENTIFICATION_VOICEPRINT_CHARACTERS ? "This voice profile is too large for speaker matching. Please record a new sample." : undefined),
+      storageId: undefined, jobId: undefined, updatedAt: Date.now(),
     });
   },
 });
-
-async function provider(path: string, body?: object) {
-  const key = process.env.PYANNOTE_API_KEY;
-  if (!key) throw new Error("Voice processing is not configured.");
-  const response = await fetch(`https://api.pyannote.ai/v1/${path}`, {
-    method: body ? "POST" : "GET", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) throw new Error("Voice service unavailable.");
-  return response.json();
-}
 
 export const start = internalAction({
   args: jobArgs,
@@ -163,7 +157,7 @@ export const start = internalAction({
     try {
       const url = await ctx.storage.getUrl(storageId);
       if (!url) throw new Error("Sample expired.");
-      const result = await provider("voiceprint", { url, model: "precision-2" });
+      const result = await pyannoteRequest("voiceprint", { url, model: "precision-2" });
       if (typeof result.jobId !== "string" || !result.jobId) throw new Error("Invalid job response.");
       await ctx.runMutation(jobRef, { ...args, jobId: result.jobId });
     } catch {
@@ -183,16 +177,17 @@ export const poll = internalAction({
       return;
     }
     try {
-      const result = await provider(`jobs/${encodeURIComponent(jobId)}`);
+      const result = await pyannoteRequest(`jobs/${encodeURIComponent(jobId)}`);
       if (result.jobId !== jobId) throw new Error("Job mismatch.");
       if (result.status === "succeeded") {
-        const voiceprint = result.output?.voiceprint;
-        if (result.output?.error || result.output?.warning || typeof voiceprint !== "string" || !voiceprint.length || voiceprint.length > 200_000) {
+        const output = asRecord(result.output);
+        const voiceprint = output?.voiceprint;
+        if (output?.error || output?.warning || typeof voiceprint !== "string" || !voiceprint.length || voiceprint.length > 200_000) {
           await ctx.runMutation(finishRef, { ...args, message: "This sample needs another take. Use a quiet room and only your own voice." });
         } else await ctx.runMutation(finishRef, { ...args, voiceprint });
         return;
       }
-      if (["failed", "canceled"].includes(result.status)) {
+      if (typeof result.status === "string" && ["failed", "canceled"].includes(result.status)) {
         await ctx.runMutation(finishRef, { ...args, message: "Your sample couldn’t be processed. Record a new sample and try again." });
         return;
       }
@@ -200,6 +195,10 @@ export const poll = internalAction({
     await ctx.scheduler.runAfter(5000, pollRef, { ...args, attempt: attempt + 1 });
   },
 });
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
 
 // Recovery if a scheduled action fails before it can finalize its sample.
 export const expireSamples = internalMutation({

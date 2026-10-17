@@ -34,6 +34,7 @@ function DetailBody({ detail, timestamp, back }: { detail: Detail; timestamp: nu
   const { conversation, turns, audioUrl } = detail;
   const [busy, setBusy] = useState(false);
   const { phase, pending, uploading } = useCapture();
+  const processingLabel = { queued: "Queued", processing: "Processing", ready: "Ready", failed: "Could not process" }[conversation.state];
   function confirmDelete() {
     Alert.alert("Delete this conversation?", "Its audio, transcript, and linked memories will be removed. This cannot be undone. Any unsent local copy is separate; discard it in Today.", [{ text: "Keep it", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => {
       setBusy(true);
@@ -41,10 +42,10 @@ function DetailBody({ detail, timestamp, back }: { detail: Detail; timestamp: nu
     } }]);
   }
   return <Page eyebrow="THE ORIGINAL WORDS" title={conversation.title} description={conversation.summary}>
-    <Text style={styles.eyebrow}>{conversation.synthetic ? "FICTIONAL DEMO" : conversation.state} · {durationLabel(conversation.duration)}</Text>
+    <Text style={styles.eyebrow}>{conversation.synthetic ? "FICTIONAL DEMO" : processingLabel} · {durationLabel(conversation.duration)}</Text>
     {audioUrl ? <AudioPlayback url={audioUrl} timestamp={timestamp} /> : <Notice>{conversation.synthetic ? "No real audio is attached to fictional conversations." : "Audio playback is unavailable or has expired. Cloud audio is retained for up to 7 days."}</Notice>}
     <Text style={styles.heading}>Conversation transcript</Text>
-    {turns.length ? turns.map((turn) => <View key={turn.id} style={[styles.card, timestamp >= turn.start && timestamp < turn.end && styles.cream]}><Text style={styles.eyebrow}>{durationLabel(turn.start)} · {turn.uncertain ? "Uncertain speaker" : turn.speaker}</Text><Text style={styles.body}>{turn.text}</Text></View>) : <Empty title="The words aren’t ready yet." description="Your audio is queued. No transcript, memory, or speaker identity has been invented. An audio worker is not connected in this build." />}
+    {turns.length ? turns.map((turn) => <View key={turn.id} style={[styles.card, timestamp >= turn.start && timestamp < turn.end && styles.cream]}><Text style={styles.eyebrow}>{durationLabel(turn.start)} · {turn.uncertain ? "Speaker uncertain" : turn.speaker}</Text><Text style={styles.body}>{turn.text}</Text></View>) : <Empty title={conversation.state === "queued" ? "Transcript queued" : conversation.state === "processing" ? "Transcript processing" : conversation.state === "failed" ? "Transcript unavailable" : "No transcript available"} description={conversation.state === "queued" ? "The audio is queued for processing. No transcript text or speaker names are invented." : conversation.state === "processing" ? "The audio is still processing. Check back when it is ready." : conversation.state === "failed" ? "Processing did not complete. No transcript is available." : "No transcript is available for this conversation."} />}
     <Notice>Recorded statements are not verified events. A plan does not establish that something happened, and a speaker label is not proof of someone’s presence.</Notice>
     {workspace.space.capabilities.includes("evidence:delete") && <Button title={busy ? "Deleting…" : "Delete conversation & linked memories"} disabled={busy || uploading || pending.length > 0 || ["recording", "starting", "saving"].includes(phase)} tone="secondary" onPress={confirmDelete} />}
     {pending.length > 0 && <Text style={styles.small}>Upload or discard pending local audio before deleting evidence, so a queued copy cannot be retried after deletion.</Text>}

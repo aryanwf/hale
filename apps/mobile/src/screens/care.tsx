@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Alert, Linking, Text, View } from "react-native";
-import { Button, Empty, Notice, Page } from "../components/ui";
+import { Button, Empty, Notice, Page, SegmentedControl } from "../components/ui";
 import { useWorkspace } from "../providers/workspace";
 import { styles } from "../theme";
 
@@ -14,12 +14,12 @@ export function CareScreen() {
   const [quotes, setQuotes] = useState(false);
   const [report, setReport] = useState<Report>();
   const [handoff, setHandoff] = useState(false);
-  const sections = [{ id: "rides", title: "Rides" }, { id: "appointments", title: "Appointments" }, { id: "medications", title: "Medication records" }] as const;
+  const sections = [{ value: "rides", label: "Rides" }, { value: "appointments", label: "Appointments" }, { value: "medications", label: "Medication" }] as const;
   function confirmReport(value: Report) {
     Alert.alert("Record this fictional self-report?", `Example medication A · ${reportLabels[value]}. This records your statement, not verified ingestion. It does not change a prescription.`, [{ text: "Go back", style: "cancel" }, { text: "Confirm demo report", onPress: () => setReport(value) }]);
   }
-  return <Page eyebrow="SUPPORT FOR THE EVERYDAY" title="A little help,\nfor what’s next." description="Always with your say-so.">
-    {sections.map((item) => <Button key={item.id} title={`${tab === item.id ? "•  " : ""}${item.title}`} tone={tab === item.id ? "primary" : "secondary"} onPress={() => setTab(item.id)} />)}
+  return <Page eyebrow="CARE AND EVERYDAY TASKS" title="Care" description="Optional tools for rides, appointments, and medication records.">
+    <SegmentedControl<CareTab> value={tab} options={sections} onChange={setTab} label="Care sections" />
     {tab === "rides" && <>
       <Text style={styles.heading}>A way to get there.</Text>
       {mode === "demo" && space.capabilities.includes("rides:prepare") ? <>

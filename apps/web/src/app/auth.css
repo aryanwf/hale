@@ -156,3 +156,33 @@
   .voice-spinner { animation: none; }
   .voice-levels i, .auth-login-card .clerk-auth-input, .auth-login-card .clerk-auth-submit, .auth-login-card .clerk-auth-social { transition: none; }
 }
+
+/* Simplified account and voice setup layouts; existing color tokens are unchanged. */
+.auth-page { grid-template-columns: minmax(280px, .85fr) minmax(360px, 1.15fr); max-width: 1440px; margin: 0 auto; }
+.auth-story { padding: 32px clamp(28px, 5vw, 64px); }
+.auth-story-body { max-width: 430px; padding: 42px 0; }
+.auth-story-body h2 { font-size: clamp(34px, 3.7vw, 50px); margin: 20px 0 16px; }
+.auth-story-body > p:last-of-type { font-size: 15px; line-height: 1.7; }
+.auth-header { min-height: 76px; padding: 16px clamp(20px, 4vw, 42px); }
+.auth-main { max-width: 480px; padding: 28px 32px 36px; }
+.auth-intro { margin-bottom: 22px; }
+.auth-intro h1, .voice-complete h1 { margin: 12px 0; font-size: clamp(28px, 2.6vw, 35px); }
+.auth-intro > p:last-child { font-size: 14px; line-height: 1.7; }
+.auth-account-type { border-radius: 10px; }
+.auth-account-type a { border-radius: 7px; font-size: 13px; }
+.auth-login-card { padding: 22px; border-radius: 12px; background: var(--ground); box-shadow: none; }
+.auth-login-card::before { display: none; }
+.auth-login-lock { border-radius: 10px; }
+.auth-login-card .clerk-auth-input, .auth-login-card .clerk-auth-submit, .auth-login-card .clerk-auth-social { border-radius: 8px; }
+.auth-login-card .clerk-auth-submit { background: var(--accent); box-shadow: none; }
+.auth-login-card .clerk-auth-submit:hover:not(:disabled) { transform: none; box-shadow: none; }
+.auth-footer { padding: 16px 20px 22px; }
+.voice-prompt { border-radius: 10px; }
+.voice-processing { border-radius: 10px; }
+
+@media (max-width: 760px) {
+  .auth-main { padding: 28px 22px 34px; }
+  .auth-login-card { padding: 18px; }
+  .auth-intro h1, .voice-complete h1 { font-size: 30px; }
+  .auth-steps { gap: 6px; margin-bottom: 22px; }
+}

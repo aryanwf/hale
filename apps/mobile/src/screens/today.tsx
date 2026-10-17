@@ -10,14 +10,14 @@ export function TodayScreen({ open, ask, care, memories }: { open: OpenConversat
   const { space, today } = useWorkspace();
   const todaysMemories = space.memories.filter((memory) => memory.localDate === today);
   const conversations = space.conversations.filter((item) => localDate(item.startedAt, space.timezone) === today);
-  return <Page eyebrow={dateLabel(today)} title={`Good to see you,\n${space.name.split(" ")[0]}.`} description="Your day, a little easier to come back to.">
+  return <Page eyebrow={dateLabel(today)} title={`Welcome,\n${space.name.split(" ")[0]}.`} description="Your recordings and memories for today.">
     <RecordingCard />
-    <View style={[styles.card, styles.cream]}><Text style={styles.heading}>A question on your mind?</Text><Text style={styles.small}>Let’s find a memory together.</Text><Button title="Ask Hale  ↗" tone="secondary" onPress={ask} /></View>
-    <Text style={styles.heading}>A little of today</Text>
-    {todaysMemories.length ? todaysMemories.slice(0, 2).map((memory) => <MemoryCard key={memory.id} memory={memory} open={open} />) : <Empty title="A new day, a little space." description="Memories appear after processing. An empty page doesn’t mean nothing happened." />}
-    <Button title="Explore your memories →" tone="secondary" onPress={memories} />
-    <Text style={styles.heading}>Recent conversations</Text>
-    {conversations.length ? conversations.slice(0, 3).map((conversation) => <ConversationCard key={conversation.id} conversation={conversation} open={open} />) : <Empty title="Room for a conversation." description="Start with a consented recording. Uploaded audio appears as queued until an audio worker is connected." />}
-    <Button title="Rides, appointments & medication records" tone="secondary" onPress={care} />
+    <View style={[styles.card, styles.cream]}><Text style={styles.heading}>Looking for a memory?</Text><Text style={styles.small}>Ask about what’s been recorded.</Text><Button title="Ask Hale" tone="secondary" onPress={ask} /></View>
+    <Text style={styles.heading}>Memories from today</Text>
+    {todaysMemories.length ? todaysMemories.slice(0, 2).map((memory) => <MemoryCard key={memory.id} memory={memory} open={open} />) : <Empty title="No saved memories yet" description="Memories appear after a recording is processed. An empty day doesn’t mean nothing happened." />}
+    <Button title="View memories" tone="secondary" onPress={memories} />
+    <Text style={styles.heading}>Today’s conversations</Text>
+    {conversations.length ? conversations.slice(0, 3).map((conversation) => <ConversationCard key={conversation.id} conversation={conversation} open={open} />) : <Empty title="No recordings today" description="Start a recording only when everyone agrees. Uploaded audio stays queued until processing is connected." />}
+    <Button title="Care and everyday tasks" tone="secondary" onPress={care} />
   </Page>;
 }

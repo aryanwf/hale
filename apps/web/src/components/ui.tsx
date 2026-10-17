@@ -29,7 +29,7 @@ export function PeopleStack({ ids, names = false }: { ids: string[]; names?: boo
 
 export function ConversationList({ conversations, base = "/family", compact = false }: { conversations: Conversation[]; base?: string; compact?: boolean }) {
   const { space, today } = useWorkspace();
-  if (!conversations.length) return <EmptyState title="No conversations yet" description="There are no recordings available here. That doesn’t mean nothing happened." />;
+  if (!conversations.length) return <EmptyState title="No conversations yet" description="There are no recordings available here yet." />;
   return <div className={`conversation-list ${compact ? "conversation-list-compact" : ""}`}>
     {!compact && <div className="conversation-table-head eyebrow"><span>WHEN</span><span>CONVERSATION</span><span>PEOPLE</span><span>STATUS</span><span /></div>}
     {conversations.map((conversation) => {

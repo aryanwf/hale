@@ -2,7 +2,7 @@ import { makeFunctionReference } from "convex/server";
 import { v, type GenericId } from "convex/values";
 import { VOICE_MATCHING_POLICY } from "@hale/contracts/voice";
 import { PyannoteApiError, pyannoteRequest } from "./lib/pyannote";
-import { matchTranscriptTurns, type MatchCandidate } from "./lib/speaker-matching";
+import { matchTranscriptTurns, type MatchCandidate } from "./lib/speakerMatching";
 import { internalAction, internalMutation, internalQuery, type DataModel, type MutationCtx } from "./lib/functions";
 
 const processRef = makeFunctionReference<"action">("speakerMatching:process");

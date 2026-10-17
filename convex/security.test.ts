@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { defineTestApp } from "convex-test";
+import { v } from "convex/values";
 import schema from "./schema";
 import * as patients from "./patients";
 import * as recordings from "./recordings";
@@ -7,7 +8,9 @@ import * as conversations from "./conversations";
 import * as privacy from "./privacy";
 import * as http from "./http";
 
-const app = defineTestApp({ schema }).defineModules({ patients, recordings, conversations, privacy, http });
+const builders = defineTestApp({ schema });
+const noopTranscribe = builders.internalAction({ args: { jobId: v.id("processingJobs") }, handler: async () => null });
+const app = builders.defineModules({ patients, recordings, conversations, privacy, http, transcriptions: { transcribe: noopTranscribe } });
 
 async function setup() {
   const t = app.createTest();

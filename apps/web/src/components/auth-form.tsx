@@ -41,9 +41,9 @@ function LiveAuth({ signup, patient }: { signup: boolean; patient: boolean }) {
   if (isSignedIn) {
     const nextStep = signup
       ? patient
-        ? "Next, create your own private patient space."
-        : "Next, introduce yourself and choose whether to set up your voice."
-      : "Your private memory space is waiting for you.";
+        ? "Next, create your patient space."
+        : "Next, create your family profile. Voice setup is optional."
+      : "Open your available patient spaces.";
 
     return (
       <div className="auth-signed-in">
@@ -51,7 +51,7 @@ function LiveAuth({ signup, patient }: { signup: boolean; patient: boolean }) {
         <h2>You’re signed in.</h2>
         <p className="muted">{nextStep}</p>
         <Link className="btn btn-primary" href={signup ? destination : "/family/overview"}>
-          {signup ? "Continue setup" : "Open my space"}
+          {signup ? "Continue" : "Open my space"}
           <ArrowRight size={17} />
         </Link>
       </div>
@@ -70,24 +70,24 @@ function AuthUnavailable() {
 export function AuthPage({ signup = false, patient = false }: { signup?: boolean; patient?: boolean }) {
   const live = appMode === "live";
   const introDescription = !signup
-    ? "Log in to reconnect with the conversations, people, and little moments that matter."
+    ? "Sign in to open the patient spaces you’re authorized to see."
     : patient
-      ? "Create your own memory space. Keep the moments that matter close, and choose who can join your circle."
-      : "Create your family account and help keep the moments that matter close.";
+      ? "Create a patient space for your recordings and memories."
+      : "Create a family account. Access to a patient space still requires permission.";
 
   return (
     <AuthShell signup={signup} patient={patient}>
       <div className="auth-intro">
-        <p className="eyebrow">{signup ? "A LITTLE CLOSER, EVEN FROM AFAR" : "A FAMILIAR PLACE TO RETURN TO"}</p>
+        <p className="eyebrow">{signup ? "CREATE YOUR ACCOUNT" : "SIGN IN TO HALE"}</p>
         <h1>
-          {signup ? <>Good memories.<br /><span>Better together.</span></> : <>Welcome back.<br /><span>Make yourself at home.</span></>}
+          {signup ? patient ? <>Create your<br /><span>patient space.</span></> : <>Create a family<br /><span>account.</span></> : <>Welcome back.<br /><span>Sign in to continue.</span></>}
         </h1>
         <p>{introDescription}</p>
       </div>
       {signup && (
         <nav className="auth-account-type" aria-label="Who is this account for?">
-          <Link href="/signup" aria-current={!patient ? "page" : undefined}>I’m a family member</Link>
-          <Link href="/signup/patient" aria-current={patient ? "page" : undefined}>I’m here for myself</Link>
+          <Link href="/signup" aria-current={!patient ? "page" : undefined}>Family account</Link>
+          <Link href="/signup/patient" aria-current={patient ? "page" : undefined}>Patient account</Link>
         </nav>
       )}
       {!live && <AuthUnavailable />}

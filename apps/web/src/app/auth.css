@@ -168,7 +168,7 @@
 .auth-intro { margin-bottom: 22px; }
 .auth-intro h1, .voice-complete h1 { margin: 12px 0; font-size: clamp(28px, 2.6vw, 35px); }
 .auth-intro > p:last-child { font-size: 14px; line-height: 1.7; }
-.auth-account-type { border-radius: 10px; }
+.auth-account-type { display: block; margin: 0 0 24px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--muted); font-size: 12px; }
 .auth-account-type a { border-radius: 7px; font-size: 13px; }
 .auth-login-card { padding: 22px; border-radius: 12px; background: var(--ground); box-shadow: none; }
 .auth-login-card::before { display: none; }

@@ -15,6 +15,7 @@ import { config } from "../lib/config";
 import { usePatientDate } from "../lib/use-patient-date";
 import type { LocalRecording } from "../lib/capture";
 import { Button, Check, Field, Gate, Loading, Notice } from "../components/ui";
+import { FamilySetup } from "../components/family-setup";
 
 export interface Workspace {
   mode: "live" | "demo";
@@ -80,7 +81,7 @@ function PatientWorkspace({ patientId, patients, selectPatient, children }: { pa
   }}>{children}</Context.Provider>;
 }
 
-function Onboarding() {
+function Onboarding({ onCreated }: { onCreated(patientId: string): void }) {
   const create = useMutation(api.createPatient);
   const { signOut } = useAuth();
   const [name, setName] = useState("");
@@ -89,7 +90,7 @@ function Onboarding() {
   const [busy, setBusy] = useState(false);
   async function submit() {
     setBusy(true);
-    try { await create({ name: name.trim(), timezone, recordingConsent: consent }); }
+    try { const patientId = await create({ name: name.trim(), timezone, recordingConsent: consent }); onCreated(patientId); }
     catch { Alert.alert("Couldn’t create your space", "Check your name, timezone, and connection, then try again."); }
     finally { setBusy(false); }
   }
@@ -99,16 +100,18 @@ function Onboarding() {
 function LiveGate({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, signOut } = useAuth({ treatPendingAsSignedOut: false });
   const { isAuthenticated, isLoading } = useConvexAuth();
-  const patients = useQuery(api.patients, isAuthenticated ? {} : "skip");
+  const patients = useQuery(api.patients, isAuthenticated ? { role: "patient" } : "skip");
   const [selected, selectPatient] = useState<string>();
   const [authOpen, setAuthOpen] = useState(false);
+  const [createdPatientId, setCreatedPatientId] = useState<string>();
   let content: ReactNode;
   if (!isLoaded) content = <Loading />;
   else if (!isSignedIn) content = <Gate title="Your memories.\nYour space." description="A familiar moment is never far away. Sign in with the same account you use on Hale."><Button title="Sign in or create an account" onPress={() => setAuthOpen(true)} /><Notice>Private memories are only available to accounts you authorize.</Notice></Gate>;
   else if (isLoading) content = <Loading message="Connecting securely…" />;
   else if (!isAuthenticated) content = <Gate title="Your connection needs attention." description="Check the Clerk convex JWT template and Convex issuer configuration."><Button title="Sign out and try again" onPress={() => void signOut()} /></Gate>;
   else if (!patients) content = <Loading />;
-  else if (!patients.length) content = <Onboarding />;
+  else if (createdPatientId) content = <FamilySetup patientId={createdPatientId} onContinue={() => { selectPatient(createdPatientId); setCreatedPatientId(undefined); }} />;
+  else if (!patients.length) content = <Onboarding onCreated={setCreatedPatientId} />;
   else {
     const patientId = patients.find((patient) => patient.id === selected)?.id ?? patients[0].id;
     content = <PatientWorkspace key={patientId} patientId={patientId} patients={patients} selectPatient={selectPatient}>{children}</PatientWorkspace>;

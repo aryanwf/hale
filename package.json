@@ -9,6 +9,9 @@
     "apps/*",
     "packages/*"
   ],
+  "dependencies": {
+    "@hale/contracts": "*"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/node": "^24",

@@ -16,7 +16,7 @@ export const deleteConversation = mutation({
       if (chunk.storageId) await ctx.storage.delete(chunk.storageId);
       await ctx.db.patch(chunk._id, { deletedAt: Date.now(), storageId: undefined, state: "failed" });
       const jobs = await ctx.db.query("processingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", chunk._id)).collect();
-      for (const job of jobs) await ctx.db.patch(job._id, { state: "failed", error: "Source deleted." });
+      for (const job of jobs) await ctx.db.patch(job._id, { state: "failed", error: "Source deleted.", updatedAt: Date.now() });
     }
     const turns = await ctx.db.query("transcriptTurns").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).collect();
     const memories = await ctx.db.query("memories").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).collect();

@@ -48,7 +48,7 @@ function VoiceFlow({ demo = false, configured, profile, onIntroduce, onUpload, o
   };
   const discard = () => { recorder.reset(); setOnlyMe(false); };
 
-  return <AuthShell signup step={3}>
+  return <AuthShell signup step={2}>
     {done ? <div className="voice-complete">
       <span className="voice-complete-icon"><CheckCircle2 size={31} strokeWidth={1.5} /></span>
       <p className="eyebrow">VOICE PROFILE</p>
@@ -101,9 +101,9 @@ function LiveVoiceOnboarding() {
   const familyCode = useQuery(api.familyCode, isAuthenticated ? {} : "skip");
   const introduce = useMutation(api.saveFamilyProfile);
   const revoke = useMutation(api.revokeVoice);
-  if (!isLoaded || (isSignedIn && isLoading) || (isAuthenticated && (!data || familyCode === undefined))) return <AuthShell signup step={3}><p role="status">Opening your voice setup…</p></AuthShell>;
+  if (!isLoaded || (isSignedIn && isLoading) || (isAuthenticated && (!data || familyCode === undefined))) return <AuthShell signup step={2}><p role="status">Opening your voice setup…</p></AuthShell>;
   if (!isSignedIn || !isAuthenticated) return <AuthShell signup step={1}><div className="auth-intro"><h1>{!isSignedIn ? "Your account comes first." : "Your connection needs attention."}</h1><p>{!isSignedIn ? "Create an account or log in before setting up your voice." : "Check the Clerk Convex JWT template and deployment issuer before continuing. No audio has been uploaded."}</p></div><Link className="btn btn-primary" href={!isSignedIn ? "/signup" : "/login"}>{!isSignedIn ? "Create an account" : "Back to login"}<ArrowRight size={16} /></Link></AuthShell>;
-  if (!familyCode?.linked && data!.profile?.voiceState !== "enrolled") return <AuthShell signup step={2}><div className="auth-intro"><h1>Connect with your loved one first.</h1><p>Once they scan your family code and approve sharing, you can optionally set up voice enrollment.</p></div><Link className="btn btn-primary" href="/family/overview">Open family dashboard<ArrowRight size={16} /></Link></AuthShell>;
+  if (!familyCode?.linked && data!.profile?.voiceState !== "enrolled") return <AuthShell signup step={1}><div className="auth-intro"><h1>Connect with your loved one first.</h1><p>Once they scan your family code and approve sharing, you can optionally set up voice enrollment.</p></div><Link className="btn btn-primary" href="/family/overview">Open family dashboard<ArrowRight size={16} /></Link></AuthShell>;
   return <VoiceFlow configured={data!.configured} profile={data!.profile}
     onIntroduce={(name, relationship) => introduce({ name, relationship })}
     onRevoke={() => revoke({})}

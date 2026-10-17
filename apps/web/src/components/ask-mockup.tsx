@@ -10,6 +10,7 @@ import {
   AudioLines,
   CalendarDays,
   MessageCircle,
+  Plus,
   ShieldCheck,
   Sparkles,
   X,
@@ -26,8 +27,6 @@ interface Exchange { id: string; question: string; answer?: RecallAnswer; day?: 
 const suggestions = [
   "What did I do today?",
   "What did Grace say about Sunday?",
-  "Who did I speak with yesterday?",
-  "Where did I leave my keys?",
 ];
 
 export function AskMockupView() {
@@ -41,7 +40,9 @@ function AskMockupThread({ day }: { day?: string }) {
   const { space, mode, today } = useWorkspace();
   const [question, setQuestion] = useState("");
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
+  const [quickAccessOpen, setQuickAccessOpen] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
+  const quickAccessRef = useRef<HTMLDivElement>(null);
 
   function ask(value: string) {
     const text = value.trim();
@@ -67,6 +68,22 @@ function AskMockupThread({ day }: { day?: string }) {
     });
   }, [exchanges]);
 
+  useEffect(() => {
+    if (!quickAccessOpen) return;
+    function closeOnOutsideClick(event: PointerEvent) {
+      if (!quickAccessRef.current?.contains(event.target as Node)) setQuickAccessOpen(false);
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setQuickAccessOpen(false);
+    }
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [quickAccessOpen]);
+
   function grow(element: HTMLTextAreaElement) {
     element.style.height = "auto";
     element.style.height = `${Math.min(element.scrollHeight, 120)}px`;
@@ -74,114 +91,112 @@ function AskMockupThread({ day }: { day?: string }) {
 
   return <div className={styles.askMockup}>
     <header className={styles.intro}>
-      <p className={styles.eyebrow}><Sparkles size={15} /> A LITTLE HELP REMEMBERING</p>
       <h1>Find <span>a memory.</span></h1>
-      <p className={styles.introDescription}>Ask about what’s been recorded.</p>
+      <p className={styles.introDescription}>Ask about recorded conversations.</p>
     </header>
 
     <div className={styles.content}>
-      <div className={styles.workspace}>
-        <section className={styles.chatPanel} aria-label="Ask Hale">
+      <section className={styles.chatPanel} aria-label="Ask Hale">
         <header className={styles.toolbar}>
           <div className={styles.assistantIdentity}>
             <span className={styles.assistantIcon}><Sparkles size={17} /></span>
-            <span className={styles.assistantCopy}><strong>Ask Hale</strong><span>Answers from your recorded conversations</span></span>
+            <span className={styles.assistantCopy}><strong>Ask Hale</strong></span>
           </div>
-          <span className={styles.scopePill}>
-            <CalendarDays size={15} />
-            {day ? dateLabel(day, { weekday: undefined, month: "short" }) : "All available memories"}
-            {day && <Link href="/family/ask" aria-label="Clear selected day" className={styles.clearScope}><X size={14} /></Link>}
-          </span>
-        </header>
-
-        {!exchanges.length && <div className={styles.welcome}>
-          <div className={styles.welcomeCopy}>
-            <span className={styles.welcomeOrb}><Sparkles size={22} strokeWidth={1.5} /></span>
-            <p className={styles.welcomeEyebrow}>START WITH A QUESTION</p>
-            <h2>A familiar moment is closer than you think.</h2>
-            <p className={styles.welcomeDescription}>Try a prompt, or type a question of your own below.</p>
-          </div>
-          <div className={styles.suggestions} aria-label="Suggested questions">
-            {suggestions.map((text) => <button key={text} type="button" onClick={() => ask(text)}>
-              <span>{text}</span><ArrowRight size={16} />
-            </button>)}
-          </div>
-        </div>}
-
-        <div className={styles.exchanges} aria-live="polite">
-          {exchanges.map((exchange) => <article className={styles.exchange} id={`ask-mockup-${exchange.id}`} key={exchange.id}>
-            <div className={styles.userMessage}>
-              <span className={styles.messageLabel}>YOU ASKED</span>
-              <p>{exchange.question}</p>
-            </div>
-            <div className={styles.assistantMessage}>
-              <span className={styles.responseIcon}><Sparkles size={15} /></span>
-              <div className={styles.responseContent}>
-                <span className={styles.messageLabel}>HALE · EXTRACTIVE RECALL</span>
-                {exchange.day && <p className={styles.resolvedScope}>Looking at {dateLabel(exchange.day, { year: "numeric" })}</p>}
-                {mode === "live" ? <LiveAnswer patientId={space.id} exchange={exchange} /> : exchange.answer && <AnswerBody answer={exchange.answer} checkLoadedSources />}
+          <div className={styles.toolbarActions}>
+            <span className={styles.scopePill}>
+              <CalendarDays size={15} />
+              {day ? dateLabel(day, { weekday: undefined, month: "short" }) : "All memories"}
+              {day && <Link href="/family/ask" aria-label="Clear selected day" className={styles.clearScope}><X size={14} /></Link>}
+            </span>
+            <div className={styles.quickAccess} ref={quickAccessRef}>
+              <button
+                type="button"
+                className={styles.quickAccessToggle}
+                aria-label="Toggle quick access"
+                aria-expanded={quickAccessOpen}
+                aria-controls="ask-quick-access-menu"
+                onClick={() => setQuickAccessOpen((open) => !open)}
+              >
+                <span>Quick access</span>
+                <span className={styles.quickAccessOrb}><Plus size={17} /></span>
+              </button>
+              <div
+                id="ask-quick-access-menu"
+                className={`${styles.quickMenu} ${quickAccessOpen ? styles.quickMenuOpen : ""}`}
+                aria-hidden={!quickAccessOpen}
+                inert={!quickAccessOpen}
+              >
+                <nav className={styles.quickMenuLinks} aria-label="Explore your memories">
+                  <Link href="/family/calendar" tabIndex={quickAccessOpen ? 0 : -1}>
+                    <span className={styles.quickMenuIcon}><CalendarDays size={17} /></span><span>Explore a day</span><ArrowRight size={15} />
+                  </Link>
+                  <Link href="/family/conversations" tabIndex={quickAccessOpen ? 0 : -1}>
+                    <span className={styles.quickMenuIcon}><MessageCircle size={17} /></span><span>Conversations</span><ArrowRight size={15} />
+                  </Link>
+                  <Link href="/family/care" tabIndex={quickAccessOpen ? 0 : -1}>
+                    <span className={styles.quickMenuIcon}><ShieldCheck size={17} /></span><span>Care &amp; tasks</span><ArrowRight size={15} />
+                  </Link>
+                </nav>
               </div>
             </div>
-          </article>)}
+          </div>
+        </header>
+
+        <div className={styles.conversationBody}>
+          {!exchanges.length && <div className={styles.welcome}>
+            <div className={styles.welcomeMessage}>
+              <span className={styles.responseIcon}><Sparkles size={20} /></span>
+              <p className={styles.welcomeTitle}>What would you like to remember?</p>
+              <p className={styles.welcomeDescription}>Ask Hale about a moment, a conversation, or a small detail.</p>
+            </div>
+          </div>}
+
+          <div className={styles.exchanges} aria-live="polite">
+            {exchanges.map((exchange) => <article className={styles.exchange} id={`ask-mockup-${exchange.id}`} key={exchange.id}>
+              <div className={styles.userMessage}>
+                <p>{exchange.question}</p>
+              </div>
+              <div className={styles.assistantMessage}>
+                <span className={styles.responseIcon}><Sparkles size={15} /></span>
+                <div className={styles.responseContent}>
+                  <span className={styles.messageLabel}>HALE</span>
+                  {exchange.day && <p className={styles.resolvedScope}>Looking at {dateLabel(exchange.day, { year: "numeric" })}</p>}
+                  {mode === "live" ? <LiveAnswer patientId={space.id} exchange={exchange} /> : exchange.answer && <AnswerBody answer={exchange.answer} checkLoadedSources />}
+                </div>
+              </div>
+            </article>)}
+          </div>
         </div>
 
-        <form className={styles.askForm} onSubmit={(event) => { event.preventDefault(); ask(question); }}>
-          <label className="sr-only" htmlFor="ask-mockup-question">Your question</label>
-          <textarea
-            id="ask-mockup-question"
-            ref={input}
-            value={question}
-            maxLength={1000}
-            rows={1}
-            placeholder="What would you like to remember?"
-            onChange={(event) => { setQuestion(event.target.value); grow(event.target); }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                ask(question);
-              }
-            }}
-          />
-          <button className={styles.sendButton} type="submit" aria-label="Ask Hale" disabled={!question.trim()}><ArrowUp size={19} /></button>
-        </form>
-        <div className={styles.chatFootnote}>
-          <span>Press Enter to ask <i>·</i> Shift + Enter for a new line</span>
-          <span>Answers are not saved as memories</span>
-        </div>
-        </section>
+        <footer className={styles.composer}>
+          {!exchanges.length && <div className={styles.suggestions} aria-label="Suggested questions">
+            {suggestions.map((text) => <button key={text} type="button" onClick={() => ask(text)}>
+              <span>{text}</span><ArrowRight size={15} />
+            </button>)}
+          </div>}
+          <form className={styles.askForm} onSubmit={(event) => { event.preventDefault(); ask(question); }}>
+            <label className="sr-only" htmlFor="ask-mockup-question">Your question</label>
+            <textarea
+              id="ask-mockup-question"
+              ref={input}
+              value={question}
+              maxLength={1000}
+              rows={1}
+              placeholder="Write a message…"
+              onChange={(event) => { setQuestion(event.target.value); grow(event.target); }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  ask(question);
+                }
+              }}
+            />
+            <button className={styles.sendButton} type="submit" aria-label="Send question" disabled={!question.trim()}><ArrowUp size={19} /></button>
+          </form>
+          <p className={styles.chatFootnote}>Questions stay here; answers aren’t saved.</p>
+        </footer>
+      </section>
 
-        <aside className={styles.explorePanel} aria-label="Memory tools">
-          <header className={styles.sideHeading}>
-            <p className={styles.sideEyebrow}>QUICK ACCESS</p>
-            <h2>Your memory tools</h2>
-          </header>
-          <nav className={styles.resourceLinks} aria-label="Explore your memories">
-            <Link href="/family/calendar">
-              <span className={styles.resourceIcon}><CalendarDays size={17} /></span>
-              <span className={styles.resourceCopy}><strong>Explore a day</strong><span>Browse recorded moments</span></span>
-              <ArrowRight size={15} />
-            </Link>
-            <Link href="/family/conversations">
-              <span className={styles.resourceIcon}><MessageCircle size={17} /></span>
-              <span className={styles.resourceCopy}><strong>Conversations</strong><span>Read the original words</span></span>
-              <ArrowRight size={15} />
-            </Link>
-            <Link href="/family/care">
-              <span className={styles.resourceIcon}><ShieldCheck size={17} /></span>
-              <span className={styles.resourceCopy}><strong>Care &amp; tasks</strong><span>Plans and everyday support</span></span>
-              <ArrowRight size={15} />
-            </Link>
-          </nav>
-        </aside>
-      </div>
-
-      <footer className={styles.groundingNote}>
-        <ShieldCheck size={19} />
-        <div className={styles.groundingCopy}>
-          <h2>Grounded in your words.</h2>
-          <p>Hale is honest about the gaps. Chats stay separate from your evidence, and a plan is not proof that something happened.</p>
-        </div>
-      </footer>
     </div>
   </div>;
 }

@@ -34,14 +34,14 @@ const appearance = {
 
 function LiveAuth({ signup }: { signup: boolean }) {
   const { isLoaded, isSignedIn } = useAuth();
-  const destination = "/family/overview";
+  const destination = signup ? "/signup/voice" : "/family/overview";
   if (!isLoaded) {
     return <p role="status" className="muted">Opening a secure connection…</p>;
   }
 
   if (isSignedIn) {
     const nextStep = signup
-      ? "Next, get your family code and connect with the patient’s Android app."
+      ? "Next, introduce yourself and optionally set up your voice profile before connecting with your loved one."
       : "Your family dashboard is waiting for you.";
 
     return (
@@ -70,7 +70,7 @@ export function AuthPage({ signup = false }: { signup?: boolean }) {
   const live = appMode === "live";
   const introDescription = !signup
     ? "Log in to see the conversations and little moments your loved one shares with you."
-    : "Create your family account. Get a private family code for your loved one to enter in the Hale Android app.";
+    : "Create your family account, introduce yourself, and optionally set up your voice profile. Then connect with your loved one using a private family code.";
 
   return (
     <AuthShell signup={signup}>

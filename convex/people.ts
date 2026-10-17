@@ -30,6 +30,11 @@ export const list = query({
         ? patientProfile
         : person.familyProfileId ? await ctx.db.get(person.familyProfileId) : null;
       const isLinked = Boolean(person.linkedSubject && profile?.subject === person.linkedSubject);
+      const linkedMembership = membership.role === "patient" && person.linkedSubject
+        ? await ctx.db.query("memberships").withIndex("by_patient_subject", (q) =>
+          q.eq("patientId", patientId).eq("subject", person.linkedSubject!),
+        ).unique()
+        : null;
       return {
         id: person._id,
         name: person.name,
@@ -40,6 +45,7 @@ export const list = query({
           : person.enrollment,
         linked: isLinked || isPatientSelf,
         isMe: person.linkedSubject === identity.subject || isPatientSelf,
+        careAccess: Boolean(isLinked && linkedMembership?.active && linkedMembership.capabilities.includes("care:manage")),
         voiceState: (isLinked || isPatientSelf) ? profile?.voiceState ?? null : null,
         voiceConsentAt: person.voiceConsentAt ?? null,
       };
@@ -213,6 +219,14 @@ export const unlinkFamilyMember = mutation({
 
     const now = Date.now();
     if (membership?.active) await ctx.db.patch(membership._id, { active: false });
+    const subscriptions = await ctx.db.query("webNotificationSubscriptions")
+      .withIndex("by_patient_subject", (q) => q.eq("patientId", patientId).eq("subject", person.linkedSubject!))
+      .take(10);
+    for (const subscription of subscriptions) await ctx.db.delete(subscription._id);
+    const careContacts = await ctx.db.query("emergencyContacts")
+      .withIndex("by_patient_createdBy", (q) => q.eq("patientId", patientId).eq("createdBy", person.linkedSubject!))
+      .take(20);
+    for (const contact of careContacts) await ctx.db.delete(contact._id);
     const recentConsents = await ctx.db.query("consents").withIndex("by_patient_subject_purpose", (q) =>
       q.eq("patientId", patientId).eq("subject", person.linkedSubject!).eq("purpose", "voice_matching"),
     ).order("desc").take(100);

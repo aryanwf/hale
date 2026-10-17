@@ -32,11 +32,11 @@ export function SettingsDetailView({ section }: { section: SettingsTopic }) {
       {section === "family-access" && <>
         <section className="settings-detail-section">
           <h2>What your family account can see</h2>
-          <p>Family access is read-only. It lets you review the patient space and the conversations and memories the patient has chosen to share. It does not let you record, delete conversations, or manage the patient’s account.</p>
+          <p>Shared conversations and memories are read-only: family members cannot record, edit, or delete them or manage the patient’s account. If the patient separately enables Care controls for a linked family member, that person can review event suggestions, manage alert contacts, and acknowledge alerts. Confirming an appointment saves a reminder in Hale; it does not book a clinic visit.</p>
           <dl className="settings-rows">
             <div><dt>Connected patient</dt><dd>{space.name}</dd></div>
             <div><dt>Patient time zone</dt><dd>{space.timezone}</dd></div>
-            <div><dt>Account access</dt><dd>{mode === "demo" ? "Fictional demo" : "Read-only family membership"}</dd></div>
+            <div><dt>Account access</dt><dd>{mode === "demo" ? "Fictional demo" : space.capabilities.includes("care:manage") ? "Shared evidence + Care controls" : "Shared evidence · Care controls off"}</dd></div>
           </dl>
         </section>
         <section className="settings-detail-section">
@@ -58,7 +58,7 @@ export function SettingsDetailView({ section }: { section: SettingsTopic }) {
         </section>
         <section className="settings-detail-section">
           <h2>What happens after approval</h2>
-          <p>Uploaded conversations and processed memories appear on the family dashboard after sharing is approved. Recording happens in the Android app, not in this browser. Family access remains read-only.</p>
+          <p>Uploaded conversations and processed memories appear on the family dashboard after sharing is approved. Recording stays in the Android app. Family members cannot edit or delete shared evidence. The patient can separately enable Care & Tasks controls for individual family members.</p>
           <Link className="text-link" href="/family/connect">Open Connect family <ArrowRight size={16} /></Link>
         </section>
       </>}

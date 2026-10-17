@@ -7,8 +7,10 @@ import * as transcriptions from "./transcriptions";
 import * as conversations from "./conversations";
 import * as privacy from "./privacy";
 import * as assistant from "./assistant";
+import * as care from "./care";
+import * as eventDetection from "./eventDetection";
 
-const app = defineTestApp({ schema }).defineModules({ patients, recordings, transcriptions, conversations, privacy, assistant });
+const app = defineTestApp({ schema }).defineModules({ patients, recordings, transcriptions, conversations, privacy, assistant, care, eventDetection });
 const tests: ReturnType<typeof app.createTest>[] = [];
 
 afterEach(async () => {
@@ -26,7 +28,7 @@ async function setup() {
   const t = app.createTest();
   tests.push(t);
   const owner = t.withIdentity({ subject: "continuous-owner" });
-  const patientId = await owner.mutation(app.api.patients.create, { name: "Synthetic Test", timezone: "UTC", recordingConsent: true });
+  const patientId = await owner.mutation(app.api.patients.create, { name: "Synthetic Test", timezone: "UTC", recordingConsent: true, externalAIConsent: true });
   const sessionId = await owner.mutation(app.api.recordings.start, { patientId, participantsConsented: true, captureMode: "native", continuous: true });
   const capturedAt = Date.now() - 1000;
   await t.run((ctx) => ctx.db.patch(sessionId, { startedAt: capturedAt }));
@@ -35,11 +37,17 @@ async function setup() {
     const args = { sessionId, sequence, capturedAt: capturedAt + sequence * 1000, endedAt: capturedAt + sequence * 1000 + 1000, storageId, mimeType: "audio/wav" };
     const result = await owner.mutation(app.internal.recordings.acceptChunk, args);
     const job = await t.run((ctx) => ctx.db.query("processingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", result.chunkId)).unique());
+    await t.run(async (ctx) => {
+      for (const scheduled of await ctx.db.system.query("_scheduled_functions").collect()) {
+        if (scheduled.state.kind === "pending") await ctx.scheduler.cancel(scheduled._id);
+      }
+    });
     return { ...result, jobId: job!._id, args, storageId };
   }
   async function finish(jobId: (Awaited<ReturnType<typeof upload>>)["jobId"], text: string) {
     const claimed = await t.mutation(app.internal.transcriptions.claim, { jobId });
-    return t.mutation(app.internal.transcriptions.complete, { jobId, generation: claimed!.generation, turns: text ? [{ start: 0, end: 0.5, text }] : [] });
+    if (!claimed) throw new Error("The test transcription job should still be queued for manual completion.");
+    return t.mutation(app.internal.transcriptions.complete, { jobId, generation: claimed.generation, turns: text ? [{ start: 0, end: 0.5, text }] : [] });
   }
   return { t, owner, patientId, sessionId, upload, finish };
 }

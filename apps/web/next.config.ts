@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
       { source: "/patient/:path*", headers: [{ key: "Cache-Control", value: "private, no-store" }] },
       { source: "/login/:path*", headers: [{ key: "Cache-Control", value: "private, no-store" }] },
       { source: "/signup/:path*", headers: [{ key: "Cache-Control", value: "private, no-store" }] },
+      { source: "/family/sw.js", headers: [{ key: "Service-Worker-Allowed", value: "/family/" }] },
       { source: "/patient/sw.js", headers: [{ key: "Service-Worker-Allowed", value: "/patient/" }] },
     ];
   },

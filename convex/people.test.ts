@@ -16,7 +16,7 @@ async function setup() {
 }
 
 describe("patient family invitations and voice consent", () => {
-  test("acceptance links one family account and grants read-only access", async () => {
+  test("acceptance links one family account and grants shared-memory access without recording or deletion capabilities", async () => {
     const { t, owner, patientId } = await setup();
     const invitation = await owner.mutation(app.api.people.createInvitation, {
       patientId, name: "Daniel Okafor", relationship: "Son",
@@ -130,6 +130,14 @@ describe("patient family invitations and voice consent", () => {
     });
     const family = t.withIdentity({ subject: "daniel-account" });
     await family.mutation(app.api.people.acceptInvitation, { token: invitation.token, useVoiceMatching: true });
+    await t.run((ctx) => ctx.db.insert("webNotificationSubscriptions", {
+      patientId, subject: "daniel-account", endpoint: "https://fcm.googleapis.com/fcm/send/daniel-device",
+      p256dh: "A".repeat(87), auth: "B".repeat(22), createdAt: Date.now(), updatedAt: Date.now(),
+    }));
+    const contactId = await t.run((ctx) => ctx.db.insert("emergencyContacts", {
+      patientId, createdBy: "daniel-account", name: "Daniel's contact", email: "daniel-contact@example.com",
+      enabled: true, createdAt: Date.now(),
+    }));
 
     await owner.mutation(app.api.people.unlinkFamilyMember, { patientId, personId: invitation.personId });
     expect(await family.query(app.api.patients.list)).toEqual([]);
@@ -147,6 +155,9 @@ describe("patient family invitations and voice consent", () => {
       q.eq("patientId", patientId).eq("subject", "daniel-account"),
     ).collect());
     expect(consent.find((item) => item.purpose === "voice_matching")?.revokedAt).toBeGreaterThan(0);
+    expect(await t.run((ctx) => ctx.db.query("webNotificationSubscriptions")
+      .withIndex("by_patient_subject", (q) => q.eq("patientId", patientId).eq("subject", "daniel-account")).take(10))).toEqual([]);
+    expect(await t.run((ctx) => ctx.db.get(contactId))).toBeNull();
     expect(await t.run((ctx) => ctx.db.query("familyProfiles").withIndex("by_subject", (q) => q.eq("subject", "daniel-account")).unique())).not.toBeNull();
     expect(await t.run((ctx) => ctx.db.query("auditEvents").withIndex("by_patient", (q) => q.eq("patientId", patientId)).collect()))
       .toContainEqual(expect.objectContaining({ operation: "family.member.unlinked", target: invitation.personId }));

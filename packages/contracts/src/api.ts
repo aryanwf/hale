@@ -6,6 +6,8 @@ export interface PatientInfo { id: string; name: string; timezone: string; capab
 export interface FamilyProfile { name: string; relationship: string; voiceState: VoiceState; message?: string }
 export interface FamilyCode { code: string; expiresAt: number; linked: boolean }
 export const api = {
+  deleteMyData: makeFunctionReference<"mutation", { confirmation: "DELETE" }, { deletedDocuments: number; deletedFiles: number }>("accounts:deleteMyData"),
+  deleteMyAccount: makeFunctionReference<"mutation", { confirmation: "DELETE" }, { deletedDocuments: number; deletedFiles: number }>("accounts:deleteMyAccount"),
   familyCode: makeFunctionReference<"query", Record<string, never>, FamilyCode | null>("families:code"),
   createFamilyCode: makeFunctionReference<"mutation", Record<string, never>, FamilyCode>("families:createCode"),
   linkFamily: makeFunctionReference<"mutation", { patientId: string; code: string }, null>("families:link"),

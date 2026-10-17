@@ -26,6 +26,12 @@ QR codes are generated locally in the browser; no pairing secrets go to an exter
 
 Use `bun install` for this workspace. `bunfig.toml` isolates dependencies so the web and Android apps keep their respective React versions.
 
+### Delete an account
+
+In web **Settings → Delete account**, review the signed-in email and type `DELETE`. The Android **Your space → Delete account** button opens the same confirmation screen. It removes Hale profiles, voiceprints, retained samples, consent records, family codes, and memberships; patient-owned spaces and their evidence/audio are deleted too. Other patients’ original conversations remain, with account-linked speaker labels anonymized. The screen then deletes the Clerk account, with reverification if required. If Clerk deletion fails or is cancelled, the screen explains that Hale data is already gone and lets the user retry the sign-in-account deletion.
+
+A one-way identity hash is retained to block old sessions from recreating deleted data. Local-only phone recordings and independent provider records are not removed by the database operation. Very large accounts fail atomically with an assisted-deletion message rather than silently deleting only part of the account. For a development onboarding reset without deleting the Clerk login, an administrator can call the internal `accounts:deleteDataForSubject` function through Convex MCP with an exact Clerk user ID and `confirmation: "DELETE"`; never use fuzzy name matching for the deletion itself.
+
 ## todo
 
 - [x] account signup, patient and family flows

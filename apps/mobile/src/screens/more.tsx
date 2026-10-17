@@ -14,6 +14,10 @@ export function MoreScreen() {
     if (!config.webUrl) { Alert.alert("Web dashboard not configured", "Set EXPO_PUBLIC_WEB_URL to manage your account’s voice profile on the web."); return; }
     void Linking.openURL(new URL("/signup/voice", config.webUrl).toString()).catch(() => Alert.alert("Couldn’t open the dashboard", "Try opening Hale in your browser."));
   }
+  function openAccountDeletion() {
+    if (!config.webUrl) { Alert.alert("Account settings unavailable", "Open the Hale website to delete your account."); return; }
+    void Linking.openURL(new URL("/account/delete", config.webUrl).toString()).catch(() => Alert.alert("Couldn’t open account settings", "Open the Hale website and go to Delete account in settings."));
+  }
   return <Page eyebrow="YOUR SPACE, YOUR CHOICES" title="A little more\npeace of mind." description="Familiar people, your privacy, and the choices that stay yours.">
     {mode === "live" && <FamilyLink patientId={space.id} disabled={busy} />}
     <Text style={styles.heading}>The voices you know.</Text>
@@ -26,5 +30,6 @@ export function MoreScreen() {
     {patients.length > 1 && <View style={styles.card}><Text style={styles.heading}>Patient spaces</Text>{patients.map((patient) => <Button key={patient.id} title={`${patient.id === space.id ? "✓  " : ""}${patient.name}`} tone="secondary" disabled={busy} onPress={() => selectPatient(patient.id)} />)}<Text style={styles.small}>Finish recording before changing patient spaces.</Text></View>}
     <Button title={mode === "demo" ? "Reset fictional demo data" : "Sign out"} tone="secondary" disabled={busy} onPress={() => Alert.alert(mode === "demo" ? "Reset demo data?" : "Sign out?", "Saved audio stays in the app’s private storage and is only shown to its owning account and patient space. Discard local files first if this device is shared.", [{ text: "Go back", style: "cancel" }, { text: "Continue", onPress: () => { void signOut().catch(() => Alert.alert("Couldn’t sign out", "Please try again.")); } }])} />
     <Notice>Use fictional identities and consented test audio only in this prototype. Audio transcription, memory extraction, speaker matching, and nightly summaries are not connected yet.</Notice>
+    {mode === "live" && <View style={styles.card}><Text style={styles.heading}>Delete account</Text><Text style={styles.small}>Permanently delete your Hale data and sign-in account. Continue in the browser, sign in to this same account, and review the confirmation. Discard any unsent local recordings separately before deleting.</Text><Button title="Delete account ↗" tone="secondary" disabled={busy} onPress={openAccountDeletion} /></View>}
   </Page>;
 }

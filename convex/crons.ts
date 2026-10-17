@@ -6,4 +6,5 @@ crons.interval("apply patient data retention", { hours: 24 }, makeFunctionRefere
 crons.interval("expire abandoned voice samples", { minutes: 15 }, makeFunctionReference<"mutation">("voices:expireSamples"), {});
 crons.interval("recover stalled Sarvam transcriptions", { minutes: 10 }, makeFunctionReference<"mutation">("transcriptions:recoverStale"), {});
 crons.interval("recover stalled speaker matching", { minutes: 10 }, makeFunctionReference<"mutation">("speakerMatching:recoverStale"), {});
+crons.interval("schedule nightly and weekly family summaries", { minutes: 15 }, makeFunctionReference<"mutation">("familySummaries:tick"), {});
 export default crons;

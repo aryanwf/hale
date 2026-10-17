@@ -1,6 +1,10 @@
 import { v, ConvexError } from "convex/values";
 import { mutation, internalMutation } from "./lib/functions";
 import { requireMember } from "./authz";
+import { makeFunctionReference } from "convex/server";
+import { conversationForChunk, settleLiveChunk } from "./lib/liveConversations";
+
+const purgeLiveRef = makeFunctionReference<"mutation">("privacy:purgeLiveConversation");
 
 export const deleteConversation = mutation({
   args: { conversationId: v.id("conversations") },
@@ -11,6 +15,14 @@ export const deleteConversation = mutation({
     if (conversation.deletedAt) return;
     // Tombstones survive retries, so late ingestion can never recreate deleted evidence.
     await ctx.db.patch(conversationId, { deletedAt: Date.now() });
+    if (conversation.sessionId) {
+      const session = await ctx.db.get(conversation.sessionId);
+      if (session) await ctx.db.patch(session._id, { state: "stopped", endedAt: Date.now() });
+      await ctx.db.patch(conversationId, { title: "Deleted conversation", summary: "", people: [] });
+      await ctx.scheduler.runAfter(0, purgeLiveRef, { conversationId });
+      await ctx.db.insert("auditEvents", { patientId: conversation.patientId, actor: identity.subject, operation: "conversation.deleted", target: conversationId, timestamp: Date.now() });
+      return;
+    }
     const chunk = await ctx.db.get(conversation.chunkId);
     if (chunk) {
       if (chunk.storageId) await ctx.storage.delete(chunk.storageId);
@@ -29,6 +41,28 @@ export const deleteConversation = mutation({
   },
 });
 
+export const purgeLiveConversation = internalMutation({
+  args: { conversationId: v.id("conversations") },
+  returns: v.null(),
+  handler: async (ctx, { conversationId }) => {
+    const conversation = await ctx.db.get(conversationId);
+    if (!conversation?.deletedAt || !conversation.sessionId) return null;
+    const chunks = await ctx.db.query("audioChunks").withIndex("by_conversationId", (q) => q.eq("conversationId", conversationId)).take(50);
+    for (const chunk of chunks) {
+      if (chunk.storageId) await ctx.storage.delete(chunk.storageId);
+      const job = await ctx.db.query("processingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", chunk._id)).unique();
+      if (job) await ctx.db.delete(job._id);
+      await ctx.db.delete(chunk._id);
+    }
+    const turns = await ctx.db.query("transcriptTurns").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).take(100);
+    for (const turn of turns) await ctx.db.delete(turn._id);
+    const memories = await ctx.db.query("memories").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).take(100);
+    for (const memory of memories) await ctx.db.delete(memory._id);
+    if (chunks.length || turns.length || memories.length) await ctx.scheduler.runAfter(0, purgeLiveRef, { conversationId });
+    return null;
+  },
+});
+
 export const expireAudio = internalMutation({
   args: {},
   handler: async (ctx) => {
@@ -41,7 +75,7 @@ export const expireAudio = internalMutation({
       const [transcription, speakerJob, conversation] = await Promise.all([
         ctx.db.query("processingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", chunk._id)).unique(),
         ctx.db.query("speakerMatchingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", chunk._id)).unique(),
-        ctx.db.query("conversations").withIndex("by_chunk", (q) => q.eq("chunkId", chunk._id)).unique(),
+        conversationForChunk(ctx, chunk),
       ]);
 
       if (transcription && transcription.state !== "ready" && transcription.state !== "failed") {
@@ -55,7 +89,8 @@ export const expireAudio = internalMutation({
             error: "Transcription could not complete before temporary audio expired.", updatedAt: now,
           });
         }
-        if (conversation && !conversation.deletedAt) {
+        if (conversation?.sessionId && !conversation.deletedAt) await settleLiveChunk(ctx, conversation, "failed");
+        else if (conversation && !conversation.deletedAt) {
           await ctx.db.patch(conversation._id, {
             state: "failed", summary: "A transcript could not be prepared before temporary audio expired. The audio was deleted; record again to retry.",
           });

@@ -1,15 +1,15 @@
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
+import { requireOptionalNativeModule } from "expo";
 import Constants from "expo-constants";
-import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder } from "expo-audio";
-import { MAX_AUDIO_BYTES, MAX_NATIVE_RECORDING_SECONDS } from "@hale/contracts/audio";
-import { CaptureController } from "../lib/capture";
-import { createCaptureStore } from "../lib/native-store";
-import { measureMediaDuration } from "../lib/media-duration";
+import { AudioModule } from "expo-audio";
+import { ContinuousCaptureController, type NativeCapture } from "../lib/continuous-capture";
 import { requestAndroidRecordingPermissions } from "../lib/recording-permissions";
 import { useWorkspace } from "./workspace";
 
-const Context = createContext<CaptureController | null>(null);
+const native = requireOptionalNativeModule<NativeCapture>("HaleCapture");
+const Context = createContext<ContinuousCaptureController | null>(null);
+
 export function useCapture() {
   const controller = useContext(Context);
   if (!controller) throw new Error("Capture provider is missing.");
@@ -20,51 +20,34 @@ export function useCapture() {
 export function CaptureProvider({ children }: { children: ReactNode }) {
   const workspace = useWorkspace();
   const latestWorkspace = useRef(workspace);
-  const controllerRef = useRef<CaptureController | null>(null);
   latestWorkspace.current = workspace;
-  const recorder = useAudioRecorder({
-    ...RecordingPresets.HIGH_QUALITY,
-    numberOfChannels: 1, sampleRate: 24000, bitRate: 24000,
-    directory: "document",
-    android: { ...RecordingPresets.HIGH_QUALITY.android, maxFileSize: MAX_AUDIO_BYTES },
-  }, (status) => {
-    if (status.isFinished || status.hasError || status.mediaServicesDidReset) void controllerRef.current?.interrupt();
-  });
-  const [controller] = useState(() => new CaptureController({
-    store: createCaptureStore(),
-    backend: {
-      owner: workspace.owner, patientId: workspace.space.id,
-      autoUploadOnStop: workspace.mode === "live",
-      beginSession: (expectedPeople) => latestWorkspace.current.beginSession(expectedPeople),
-      endSession: (id) => latestWorkspace.current.endSession(id),
-      upload: (recording) => latestWorkspace.current.upload(recording),
-    },
-    device: {
-      prepare: async () => {
-        if (Constants.appOwnership === "expo" || Platform.OS !== "android") throw new Error("Background recording requires the Hale Android development build, not Expo Go.");
-        if (AppState.currentState !== "active") throw new Error("Open Hale before starting the microphone.");
-        await requestAndroidRecordingPermissions({
-          apiLevel: Number(Platform.Version),
-          requestMicrophone: () => AudioModule.requestRecordingPermissionsAsync(),
-          requestNotifications: () => AudioModule.requestNotificationPermissionsAsync(),
-        });
-        await setAudioModeAsync({ allowsRecording: true, allowsBackgroundRecording: true, interruptionMode: "doNotMix" });
-        await recorder.prepareToRecordAsync();
-        if (!recorder.uri) throw new Error("The microphone did not provide a local recording file.");
-        return recorder.uri;
-      },
-      record: () => recorder.record({ forDuration: MAX_NATIVE_RECORDING_SECONDS }),
-      stop: async () => { if (recorder.getStatus().canRecord) await recorder.stop(); },
-      status: () => ({ ...recorder.getStatus(), isRecording: recorder.isRecording }),
-      measureDuration: measureMediaDuration,
-      disable: () => setAudioModeAsync({ allowsRecording: false, allowsBackgroundRecording: false }),
+  const [controller] = useState(() => new ContinuousCaptureController({
+    native: workspace.mode === "live" ? native : null,
+    owner: workspace.owner, patientId: workspace.space.id,
+    beginSession: () => latestWorkspace.current.beginContinuousSession(),
+    endSession: (id) => latestWorkspace.current.endSession(id),
+    uploadCredentials: () => latestWorkspace.current.uploadCredentials(),
+    requestPermissions: async () => {
+      if (Constants.appOwnership === "expo" || Platform.OS !== "android") throw new Error("Install the Hale Android build for continuous recording.");
+      if (AppState.currentState !== "active") throw new Error("Open Hale before switching recording on.");
+      await requestAndroidRecordingPermissions({
+        apiLevel: Number(Platform.Version),
+        requestMicrophone: () => AudioModule.requestRecordingPermissionsAsync(),
+        requestNotifications: () => AudioModule.requestNotificationPermissionsAsync(),
+      });
     },
   }));
-  controllerRef.current = controller;
   useEffect(() => {
-    const interval = setInterval(controller.observe, 1000);
-    const subscription = AppState.addEventListener("change", (state) => { if (state === "active") controller.observe(); });
-    return () => { clearInterval(interval); subscription.remove(); controller.dispose(); };
+    void controller.observe().then(() => controller.refreshCredentials());
+    const statusInterval = setInterval(() => void controller.observe(), 1000);
+    const authInterval = setInterval(() => {
+      const snapshot = controller.getSnapshot();
+      if (snapshot.hasActiveRecording || snapshot.pendingCount || snapshot.needsFinalization) void controller.refreshCredentials();
+    }, 30_000);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void controller.observe().then(() => controller.refreshCredentials());
+    });
+    return () => { clearInterval(statusInterval); clearInterval(authInterval); subscription.remove(); controller.dispose(); };
   }, [controller]);
   return <Context.Provider value={controller}>{children}</Context.Provider>;
 }

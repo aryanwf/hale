@@ -55,15 +55,19 @@ export default defineSchema({
     state: v.union(v.literal("recording"), v.literal("paused"), v.literal("interrupted"), v.literal("stopped")),
     consentConfirmedAt: v.number(),
     captureMode: v.optional(v.union(v.literal("native"), v.literal("web"))),
+    continuous: v.optional(v.boolean()), conversationId: v.optional(v.id("conversations")),
+    lastChunkAt: v.optional(v.number()),
     expectedPeople: v.optional(v.array(v.id("people"))),
-  }).index("by_patient", ["patientId"]),
+  }).index("by_patient", ["patientId"]).index("by_continuous_state_lastChunkAt", ["continuous", "state", "lastChunkAt"]),
   audioChunks: defineTable({
     patientId: v.id("patients"), sessionId: v.id("recordingSessions"),
     sequence: v.number(), storageId: v.optional(v.id("_storage")),
+    conversationId: v.optional(v.id("conversations")),
     capturedAt: v.number(), endedAt: v.number(), mimeType: v.string(),
     state: v.union(v.literal("queued"), v.literal("processing"), v.literal("ready"), v.literal("failed")),
     expiresAt: v.number(), deletedAt: v.optional(v.number()),
   }).index("by_session_sequence", ["sessionId", "sequence"]).index("by_expiry", ["expiresAt"])
+    .index("by_conversationId", ["conversationId"])
     .index("by_patientId", ["patientId"]),
   processingJobs: defineTable({
     patientId: v.id("patients"), chunkId: v.id("audioChunks"),
@@ -86,10 +90,13 @@ export default defineSchema({
     localDate: v.string(), people: v.array(v.id("people")),
     state: v.union(v.literal("queued"), v.literal("processing"), v.literal("ready"), v.literal("failed")),
     deletedAt: v.optional(v.number()),
+    sessionId: v.optional(v.id("recordingSessions")), pendingChunks: v.optional(v.number()),
+    failedChunks: v.optional(v.number()), processedChunks: v.optional(v.number()),
   }).index("by_patient_date", ["patientId", "localDate"]).index("by_chunk", ["chunkId"]),
   transcriptTurns: defineTable({
     patientId: v.id("patients"), conversationId: v.id("conversations"),
     speaker: v.string(), personId: v.optional(v.id("people")),
+    chunkId: v.optional(v.id("audioChunks")),
     start: v.number(), end: v.number(), text: v.string(), uncertain: v.boolean(),
   }).index("by_conversation", ["conversationId", "start"])
     .index("by_patientId", ["patientId"]).index("by_personId", ["personId"])

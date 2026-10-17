@@ -1,6 +1,6 @@
 # Hale for Android
 
-The Android patient app lives in `apps/mobile`, next to the web dashboard, and uses Hale’s shared contracts, Clerk authentication, Convex patient spaces, and `expo-audio` native capture. Expo SDK 57 provides document-directory recording and a microphone foreground service. The mobile target, build commands, and CI workflow are Android-only; no Mac, Apple account, signing subscription, or Play Store account is needed for local development.
+The Android patient app lives in `apps/mobile`, next to the web dashboard, and uses Hale’s shared contracts, Clerk authentication, and Convex patient spaces. Its layout, fonts, colors, Lucide icons, pill buttons, and three-tab navigation match the web patient app. A local Expo module supplies continuous native microphone capture and uploads. No Mac, Apple account, signing subscription, or Play Store account is needed for local development.
 
 ## Windows setup (once)
 
@@ -113,7 +113,7 @@ EAS is optional: `development` produces an APK with a development client, `previ
 
 ## Demo and live accounts
 
-Demo mode uses labeled fictional dashboard data. Recording still requests microphone permission and participant consent; use only consented test audio. Demo audio is not uploaded.
+Demo mode uses labeled fictional dashboard data. Its live recording switch is disabled; it never opens the microphone or uploads audio. Older demo clips can still be explicitly discarded.
 
 For live mode, set in `apps/mobile/.env.local`:
 
@@ -129,7 +129,7 @@ Live mode never substitutes demo data for a connection or authorization failure.
 
 ## Patient features
 
-- **Today:** consented recording, today’s memories, recent conversations, recall and care shortcuts.
+- **Today:** an opt-in recording switch, the latest live dialogue, today’s memories, recent conversations, recall and care shortcuts.
 - **Memories:** patient-timezone day navigation, date selection, conversation/transcript search, linked source records, bounded-result notices.
 - **Ask Hale:** source-bound text recall, original transcript citations and audio offsets, scoped-day questions, honest abstention. Questions are not stored as evidence.
 - **Care:** the same explicitly disconnected ride/calendar/medication integrations as the web app, with labeled demo quotes and confirmed fictional self-reports. No live booking or dosing advice.
@@ -137,20 +137,26 @@ Live mode never substitutes demo data for a connection or authorization failure.
 
 Geist is used for the UI, Libre Baskerville for editorial headings, and IBM Plex Mono for metadata. Fonts ship with the app. The warm neutral/burgundy palette is centralized in `src/theme.ts`.
 
-## Background microphone capture
+## Continuous recording and live dialogue
 
-Both `enableBackgroundRecording` in the native config plugin and `allowsBackgroundRecording` at runtime are required. The app starts capture only after an explicit tap while foregrounded and participant consent. Native audio capture—not a JavaScript timer—continues while the screen is locked or the app is backgrounded.
+Install a rebuilt Android development app after updating: `bun run mobile:apk` or `bun run mobile:android`. Fast Refresh alone cannot install `modules/hale-capture` or the SVG icon dependency. An older binary displays a disabled switch instead of falling back to a JavaScript-only recorder.
 
-- **Android:** Expo’s microphone foreground service and OS recording indicator/stop action. This installed `expo-audio` version requires notification permission on Android 13+ before preparing background capture. Hale requests microphone access first, then notifications; denial blocks recording with a settings explanation rather than silently dropping the foreground service.
-- The recorder is above tab navigation, so moving between dashboard screens does not stop capture. Original-audio playback is not retained in Hale.
-- Native `forDuration` stops each file at one hour, even when JavaScript is suspended. Mono AAC targets 24 kbps/24 kHz; the server additionally rejects files over 20 MB. Web sessions keep their existing two-minute limit.
-- Pause finalizes a file and session. Resume starts a fresh segment; pause gaps are not represented as recorded audio.
-- Files are written directly into app documents. A small journal records ownership, patient space, session ID, URI, timestamps, and last measured native duration. At most three local files may be queued across accounts/spaces.
-- Capture files are temporary local upload buffers, not saved recordings. Live mode uploads them for transcription after each segment ends, then removes the local copy once the server accepts it. Failed uploads remain in the private app queue for retry or discard. Uploads use stable `(sessionId, sequence=0)` idempotency keys. Pending audio is visible only to its owning account and patient space. Sign back into that account/space to clear its queue.
-- Calls, route changes, native errors, OS battery policies, force-stop, and termination can interrupt capture. There is no automatic restart. After restart, journal recovery uses the last measured duration; final audio may be incomplete or unplayable. Recovery is best effort, not guaranteed coverage.
-- Local files are sandboxed, **not application-encrypted**. Android app backup is disabled. Uninstalling or clearing app data destroys unsent audio. Do not use real patient data in this prototype.
+1. Switch recording **on** from Today while Hale is foregrounded. Confirm that everyone present agrees. Microphone and Android 13+ notification permissions are required.
+2. One native `AudioRecord` stays open. The microphone foreground service and wake lock continue capture with the screen locked, without JavaScript recording timers. Its persistent notification has a **Stop recording** action.
+3. Native code seals 16 kHz mono PCM WAV segments every ten seconds and uploads them using authenticated HTTPS. Sarvam Saaras v4 transcribes each segment; Convex appends timestamped dialogue to **one conversation per toggle-on session**. The latest dialogue updates on Today, and the full conversation has paginated transcript access.
+4. Switch **off** anywhere using the compact recording control or the Android notification. The microphone stops immediately; the final partial segment and any queued segments finish uploading before the server session is closed. Turning on again starts a new conversation, not an extension across an unrecorded gap.
 
-Live uploads now run through Sarvam Saaras v4 transcription (REST for clips up to 30 seconds, batch for longer clips up to two hours). Selected, consented voice profiles can be matched with pyannote; uncertain or unselected voices remain unknown. Hale deletes the uploaded audio after transcription and any matching, or after a 24-hour fallback TTL if processing stalls. Transcripts remain until the conversation is deleted. Provider processing and independent retention are governed by provider terms. Memory extraction and nightly summaries are not connected yet.
+This is **near-live segment transcription**, not word-by-word WebSocket streaming. Expect roughly a segment interval plus provider latency; slow networks can add delay. Live mode deliberately leaves speakers unknown; it does not run pyannote matching or claim verified speaker identity. Earlier single-file recordings still support the existing REST/batch and selected-speaker workflows.
+
+- Capture and uploads run natively while the service is active. Short-lived upload JWTs refresh through the same native Clerk session used by `AuthView`, not a background JavaScript timer. Tokens remain in memory, never in the audio journal.
+- Temporary PCM files and an atomic session journal live in private app storage. The offline queue holds **30 ten-second segments (about five minutes / 9.6 MB)**. Capture stops if it fills; it does not overwrite audio or silently skip speech. Reconnect to upload, or explicitly discard unsent audio. New sessions are blocked while a previous queue is unresolved, including across accounts/patient spaces.
+- Uploads use stable `(sessionId, sequence)` idempotency keys. Per-segment generation checks prevent duplicate dialogue and late writes after deletion. Failed segments are reported as gaps without removing earlier dialogue. Silence does not invent dialogue.
+- After a process interruption, saved partial WAV files are repaired from available complete PCM samples. Recording never restarts automatically. Recovery is best effort, not guaranteed coverage. Abandoned server sessions are closed by stale-job recovery after inactivity; queued historical segments can still be accepted if captured before closure.
+- Older AAC clips from the previous mobile recorder remain accessible under **Earlier saved clips**. The upgrade does not discard them.
+- Calls, audio focus loss, Android silencing, storage failures, force-stop, and battery policies may interrupt capture. The service is `START_NOT_STICKY`. Navigating tabs does not stop capture; leaving/unmounting the patient workspace does.
+- Local audio is sandboxed, **not application-encrypted**. Android backup is disabled. Uninstalling or clearing app data destroys unsent audio. Do not use real patient data in this prototype.
+- Hale deletes each uploaded audio segment after transcription, or after the existing 24-hour fallback TTL if processing stalls. Transcript text stays until conversation deletion. Provider retention is governed by provider terms. Memory extraction and nightly summaries are not connected.
+- Continuous capture consumes **battery, mobile data, and Sarvam API quota**. It does not bypass Android’s microphone indicators or consent requirements.
 
 ## Verification
 
@@ -159,19 +165,22 @@ bun run --cwd apps/mobile typecheck
 bun run --cwd apps/mobile test
 bun run --cwd apps/mobile check:native
 bun run test
+# Native WAV/journal tests (Android SDK/JDK required):
+cd apps/mobile/android
+./gradlew :hale-capture:testDebugUnitTest --max-workers=2
 ```
 
 Before claiming on-device background support is verified, use consented test audio on a **physical Android phone**, leaving Metro connected and making no source edits during each test:
 
-1. Enable microphone access and, on Android 13+, notifications, confirm everyone’s consent, and start from Today.
-2. Speak, switch tabs/apps, lock the screen for at least 3 minutes, then return. Verify native duration and recorded audio include the locked-screen speech.
-3. Pause, wait, resume, then stop. Confirm separate files, no silently restarted capture, and no pause-gap audio claim.
+1. Enable microphone access and, on Android 13+, notifications, confirm everyone’s consent, and switch on from Today.
+2. Speak, switch tabs/apps, lock the screen for at least 3 minutes, then return. Verify that ten-second segments were uploaded and their dialogue appended to the same conversation while locked. This must exceed the short-lived JWT lifetime to verify native refresh.
+3. Switch off, wait for processing, then switch on again. Confirm separate conversations and no invented pause-gap dialogue.
 4. Test an incoming call, route/headphone changes, denied microphone/notification permission, Android notification stop, and battery restrictions. Confirm truthful denial/interruption state.
-5. Save offline, restart the app, reconnect, and upload the temporary local clip. Retry after a simulated failed response; verify only one server conversation is created per file and the local file is removed after server acceptance.
+5. Go offline long enough to fill the five-minute queue. Confirm capture stops, the audio remains recoverable after restart, and reconnect/retry creates no duplicate dialogue. Files must disappear only after server acceptance or explicit discard.
 6. Sign in/out, restart, and switch patient spaces. Confirm session persistence, disabled switching during capture, and account/patient isolation of queued files.
 7. Test deletion, consent revocation during matching, temporary audio expiry, empty search results, and source citations.
-8. Test the one-hour native stop while locked; verify media duration and accepted upload size.
-9. Stop and save audio, edit a screen label, and confirm Fast Refresh updates the phone. Then fully reload/restart and confirm durable queued audio remains available.
+8. Run an extended locked-screen session, verify ordered dialogue offsets across many segments, and use Load more dialogue to inspect a long conversation.
+9. Switch off, edit a screen label, and confirm Fast Refresh updates the phone. Then fully reload/restart and confirm durable queued audio remains available and the switch stays off.
 
 Automated controller/backend tests cannot prove OS background execution or microphone hardware behavior. That device matrix remains a release gate.
 

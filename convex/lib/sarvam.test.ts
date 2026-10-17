@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { completeChat, SarvamApiError, synthesizeSpeech, transcribeAudio, translateText } from "./sarvam";
+import { completeChat, pollBatchTranscription, SarvamApiError, synthesizeSpeech, transcribeAudio, translateText } from "./sarvam";
 
 const originalFetch = globalThis.fetch;
 let previousKey: string | undefined;
@@ -49,6 +49,29 @@ describe("Sarvam API adapter", () => {
     expect(result.timestamps?.segments).toEqual(["வணக்கம்"]);
     expect(result.timestamps?.startTimeSeconds).toEqual([0]);
   });
+
+  for (const timestampField of ["words", "chunks"]) {
+    test(`preserves batch timestamps returned as ${timestampField}`, async () => {
+      mockFetch((url) => {
+        if (url.endsWith("/status")) return Response.json({
+          job_id: "batch-test", job_state: "Completed",
+          job_details: [{ state: "Success", outputs: [{ file_name: "0.json" }] }],
+        });
+        if (url.endsWith("/download-files")) return Response.json({
+          download_urls: { "0.json": { file_url: "https://storage.example/result.json" } },
+        });
+        return Response.json({
+          transcript: "We will visit the garden on Saturday.", language_code: "en-IN",
+          timestamps: { [timestampField]: ["We will visit the garden on Saturday."], start_time_seconds: [0.23], end_time_seconds: [5.63] },
+        });
+      });
+
+      expect(await pollBatchTranscription("batch-test")).toMatchObject({
+        state: "completed",
+        transcript: { timestamps: { segments: ["We will visit the garden on Saturday."], startTimeSeconds: [0.23], endTimeSeconds: [5.63] } },
+      });
+    });
+  }
 
   test("uses Sarvam Translate for the full language set", async () => {
     mockFetch(Response.json({ translated_text: "Hello, how are you?" }));

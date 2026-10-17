@@ -16,6 +16,7 @@ import type * as crons from "../crons.js";
 import type * as families from "../families.js";
 import type * as http from "../http.js";
 import type * as lib_functions from "../lib/functions.js";
+import type * as lib_liveConversations from "../lib/liveConversations.js";
 import type * as lib_pyannote from "../lib/pyannote.js";
 import type * as lib_sarvam from "../lib/sarvam.js";
 import type * as lib_speakerMatching from "../lib/speakerMatching.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   families: typeof families;
   http: typeof http;
   "lib/functions": typeof lib_functions;
+  "lib/liveConversations": typeof lib_liveConversations;
   "lib/pyannote": typeof lib_pyannote;
   "lib/sarvam": typeof lib_sarvam;
   "lib/speakerMatching": typeof lib_speakerMatching;

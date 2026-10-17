@@ -246,19 +246,19 @@ function parseBatchTranscript(value: unknown): SarvamTranscript | null {
   const result = asRecord(value);
   if (!result || typeof result.transcript !== "string") return null;
   const timestamps = asRecord(result.timestamps);
-  const chunks = timestamps?.chunks;
+  const segments = timestamps?.words ?? timestamps?.chunks;
   const starts = timestamps?.start_time_seconds;
   const ends = timestamps?.end_time_seconds;
-  const validTimestamps = Array.isArray(chunks) && chunks.every((item) => typeof item === "string")
+  const validTimestamps = Array.isArray(segments) && segments.every((item) => typeof item === "string")
     && Array.isArray(starts) && starts.every((item) => typeof item === "number" && Number.isFinite(item))
     && Array.isArray(ends) && ends.every((item) => typeof item === "number" && Number.isFinite(item))
-    && chunks.length === starts.length && chunks.length === ends.length;
+    && segments.length === starts.length && segments.length === ends.length;
   return {
     transcript: result.transcript,
     languageCode: typeof result.language_code === "string" ? result.language_code : null,
     languageProbability: null,
     requestId: typeof result.request_id === "string" ? result.request_id : null,
-    ...(validTimestamps ? { timestamps: { segments: chunks as string[], startTimeSeconds: starts as number[], endTimeSeconds: ends as number[] } } : {}),
+    ...(validTimestamps ? { timestamps: { segments: segments as string[], startTimeSeconds: starts as number[], endTimeSeconds: ends as number[] } } : {}),
   };
 }
 

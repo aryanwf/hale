@@ -1,47 +1,32 @@
-import { useEffect, useRef, useState } from "react";
-import { AppState, Linking, Text, View } from "react-native";
+import { Component, Suspense, lazy, type ReactNode } from "react";
+import { requireOptionalNativeModule } from "expo";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { CameraView, useCameraPermissions, type BarcodeScanningResult } from "expo-camera";
-import { readFamilyQr } from "@hale/contracts/family-link";
 import { Button, Page } from "./ui";
 import { styles } from "../theme";
 
-export function FamilyScanner({ onScan, onClose }: { onScan(code: string): void; onClose(): void }) {
-  const [permission, requestPermission, refreshPermission] = useCameraPermissions();
-  const [active, setActive] = useState(AppState.currentState === "active");
-  const [error, setError] = useState("");
-  const [cameraFailed, setCameraFailed] = useState(false);
-  const accepted = useRef(false);
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => {
-      setActive(state === "active");
-      if (state === "active") void refreshPermission().catch(() => setError("Couldn’t check camera access. Enter the family code instead."));
-    });
-    return () => subscription.remove();
-  }, [refreshPermission]);
-  async function allowCamera() {
-    setError("");
-    try {
-      if (permission && !permission.canAskAgain) await Linking.openSettings();
-      else await requestPermission();
-    } catch { setError("Couldn’t open the camera. You can enter the family code instead."); }
-  }
-  function scanned({ data }: BarcodeScanningResult) {
-    if (accepted.current) return;
-    const code = readFamilyQr(data);
-    if (!code) { setError("This isn’t a Hale family QR code. Scan the QR code on your family member’s dashboard, or enter their family code instead."); return; }
-    accepted.current = true;
-    onScan(code);
-  }
-  return <SafeAreaView style={styles.screen}><Page eyebrow="CONNECT YOUR FAMILY" title="Scan their family QR code." description="Point your camera at the QR code on your family member’s Hale dashboard. You’ll confirm sharing before anything is linked.">
-    {!permission ? <Text style={styles.small}>Checking camera permission…</Text> : !permission.granted ? <View style={styles.card}>
-      <Text style={styles.body}>Camera access is only used for scanning. No photos or video are saved or uploaded.</Text>
-      <Button title={permission.canAskAgain ? "Allow camera access" : "Open camera settings"} onPress={() => void allowCamera()} />
-      <Text style={styles.small}>Prefer not to use your camera? Enter the family code instead.</Text>
-    </View> : cameraFailed ? <Text style={styles.body}>The camera couldn’t start. Close the scanner and enter the family code instead.</Text> : active ? <View style={{ height: 300, borderRadius: 20, overflow: "hidden" }}>
-      <CameraView style={{ flex: 1 }} facing="back" barcodeScannerSettings={{ barcodeTypes: ["qr"] }} onBarcodeScanned={scanned} onMountError={() => setCameraFailed(true)} />
-    </View> : <Text style={styles.small}>Return to Hale to resume scanning.</Text>}
-    {error && <Text accessibilityRole="alert" style={styles.small}>{error}</Text>}
+export interface FamilyScannerProps {
+  onScan(code: string): void;
+  onClose(): void;
+}
+
+const FamilyCamera = lazy(() => import("./family-camera").then((module) => ({ default: module.FamilyCamera })));
+
+function ScannerNotice({ title, description, onClose }: { title: string; description: string; onClose(): void }) {
+  return <SafeAreaView style={styles.screen}><Page eyebrow="CONNECT YOUR FAMILY" title={title} description={description}>
     <Button title="Enter family code instead" tone="secondary" onPress={onClose} />
   </Page></SafeAreaView>;
+}
+
+class CameraBoundary extends Component<{ children: ReactNode; onClose(): void }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() {
+    if (this.state.failed) return <ScannerNotice title="The camera couldn’t open." description="Restart Hale and try again. If this app was installed before QR scanning was added, install a rebuilt Android development app. You can still enter the family code manually." onClose={this.props.onClose} />;
+    return this.props.children;
+  }
+}
+
+export function FamilyScanner(props: FamilyScannerProps) {
+  if (!requireOptionalNativeModule("ExpoCamera")) return <ScannerNotice title="This app needs a camera update." description="The installed Android app doesn’t include the camera module. Rebuild and reinstall Hale using bun run mobile:android, then restart Metro. Reloading JavaScript alone cannot add the camera. Manual code entry still works." onClose={props.onClose} />;
+  return <CameraBoundary onClose={props.onClose}><Suspense fallback={<ScannerNotice title="Opening camera…" description="Preparing the QR scanner." onClose={props.onClose} />}><FamilyCamera {...props} /></Suspense></CameraBoundary>;
 }

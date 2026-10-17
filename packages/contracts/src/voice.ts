@@ -5,6 +5,7 @@ export const VOICE_TARGET_SECONDS = 25;
 export const VOICE_MAX_SECONDS = 30;
 export const VOICE_MAX_BYTES = 44 + VOICE_SAMPLE_RATE * VOICE_MAX_SECONDS * 2;
 export const VOICE_POLICY = "voice-2026-10-15-v1";
+export const VOICE_MATCHING_POLICY = "voice-matching-2026-10-17-v1";
 
 export type VoiceState = "not_enrolled" | "skipped" | "queued" | "processing" | "enrolled" | "failed" | "revoked";
 

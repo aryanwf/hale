@@ -4,6 +4,7 @@ import { useCapture } from "../providers/capture";
 import { useWorkspace } from "../providers/workspace";
 import { config } from "../lib/config";
 import { styles } from "../theme";
+import { FamilyLink } from "../components/family-link";
 
 export function MoreScreen() {
   const { space, mode, patients, selectPatient, signOut } = useWorkspace();
@@ -18,8 +19,8 @@ export function MoreScreen() {
     void Linking.openURL(new URL("/signup/voice", config.webUrl).toString())
       .catch(() => Alert.alert("Couldn’t open the dashboard", "Try opening Hale in your browser."));
   }
-
   return <Page eyebrow="SETTINGS" title="Your space" description="People, privacy, recordings, and account settings.">
+    {mode === "live" && <FamilyLink patientId={space.id} disabled={busy} />}
     <View style={styles.stack}>
       <Text style={styles.heading}>People</Text>
       {space.people.length ? space.people.map((person) => <View key={person.id} style={styles.card}>
@@ -37,7 +38,7 @@ export function MoreScreen() {
       <Text style={styles.body}>{space.name}</Text>
       <Text style={styles.small}>Timezone · {space.timezone}</Text>
       <Text style={styles.small}>{mode === "demo" ? "Fictional demo data only" : "Access is checked by the server"}</Text>
-      <Text style={styles.small}>Family invitations are not available yet. Voice enrollment does not grant access.</Text>
+      <Text style={styles.small}>Family sharing requires your approval. Voice enrollment does not grant access.</Text>
     </View>
 
     <View style={styles.card}>

@@ -19,8 +19,8 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "hale.", template: "%s · hale." },
-  description: "A private, evidence-backed memory aid. Remember the conversations and little moments that matter.",
+  title: { default: "hale. — your family dashboard", template: "%s · hale." },
+  description: "Stay close to your loved one through the conversations and memories they choose to share from Hale on Android.",
   robots: { index: false, follow: false },
 };
 

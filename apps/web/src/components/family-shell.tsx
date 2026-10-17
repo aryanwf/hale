@@ -8,8 +8,8 @@ import { PatientSwitcher } from "./patient-switcher";
 
 const navigation = [
   ["Overview", "/family/overview"], ["Calendar", "/family/calendar"],
-  ["Conversations", "/family/conversations"], ["Care", "/family/care"],
-  ["People", "/family/people"], ["Ask Hale", "/family/ask"], ["Settings", "/family/settings"],
+  ["Conversations", "/family/conversations"], ["Care & Tasks", "/family/care"],
+  ["People", "/family/people"], ["Ask Hale", "/family/ask"], ["Connect family", "/family/connect"], ["Settings", "/family/settings"],
 ];
 
 export function FamilyShell({ children }: { children: React.ReactNode }) {
@@ -21,9 +21,9 @@ export function FamilyShell({ children }: { children: React.ReactNode }) {
         <Link className="family-search-shortcut" href="/family/conversations#conversation-search" aria-label="Search conversations"><Search size={17} /><span>Search</span></Link>
         <Link href="/patient/today" className="patient-view-link">Recording view<ArrowUpRight size={14} /></Link>{account}
       </div></div>
-       <nav className="family-tabs" aria-label="Family navigation">{navigation.map(([label, href]) => <Link key={href} href={href} aria-current={pathname === href || pathname.startsWith(`${href}/`) ? "page" : undefined}>{label}</Link>)}</nav>
-     </div></header>
-    {mode === "demo" && <div className="demo-banner"><div className="page-wrap"><span><FlaskConical size={14} /><strong>Demo space</strong><span className="demo-banner-description">Fictional records only. Nothing here is live.</span></span><Link href="/family/settings">Demo details<ArrowUpRight size={13} /></Link></div></div>}
-     <main id="main" className="page-wrap family-main">{children}</main>
+      <nav className="family-tabs" aria-label="Family navigation">{navigation.map(([label, href]) => <Link key={href} href={href} aria-current={pathname === href || pathname.startsWith(`${href}/`) ? "page" : undefined}>{label}</Link>)}</nav>
+    </div></header>
+    {mode === "demo" && <div className="demo-banner"><div className="page-wrap"><span><FlaskConical size={14} /><strong>Demo space</strong><span className="demo-banner-description">Fictional people, synthetic memories. Nothing here is a live patient record.</span></span><Link href="/family/settings">About this demo<ArrowUpRight size={13} /></Link></div></div>}
+    <main id="main" className="page-wrap family-main">{children}</main>
   </div>;
 }

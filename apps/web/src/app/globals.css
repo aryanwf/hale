@@ -1028,6 +1028,8 @@ a, .text-link, .icon-button, .back-link, .patient-view-link, .family-tabs a, .pa
 .family-connection-error { margin-top: 13px; font-size: 12px; }
 .account-danger { border-color: var(--accent); margin-top: 24px; }
 .account-danger .icon-label { color: var(--accent); }
+.settings-view .account-danger { margin-top: 28px; border-left-width: 4px; background: var(--blush); }
+.settings-view .account-danger .icon-label h2 { color: var(--accent-deep); }
 .deletion-details { list-style: disc; padding-left: 20px; display: grid; gap: 12px; line-height: 1.7; }
 
 @media (max-width: 760px) {

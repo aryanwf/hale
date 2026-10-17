@@ -1,2 +1,2 @@
-import { CareView } from "@/components/care";
-export default function CarePage() { return <CareView />; }
+import { CareMockupView } from "@/components/care-mockup";
+export default function CarePage() { return <CareMockupView />; }

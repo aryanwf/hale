@@ -3,8 +3,8 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
-import { ArrowLeft, AudioLines, Play, ShieldCheck, Trash2 } from "lucide-react";
+import { useMutation, useQuery } from "convex/react";
+import { ArrowLeft, AudioLines, Play, RotateCcw, ShieldCheck, Trash2 } from "lucide-react";
 import type { Conversation, Memory, TranscriptTurn } from "@hale/contracts";
 import { clockLabel, dateLabel, durationLabel, localDate } from "@hale/contracts/time";
 import { useWorkspace } from "./providers";
@@ -22,23 +22,25 @@ export function ConversationDetail({ id, patient = false }: { id: string; patien
 function LiveDetail({ id, patient }: { id: string; patient: boolean }) {
   const { space } = useWorkspace();
   const detail = useQuery(api.detail, { conversationId: id });
+  const retryTranscription = useMutation(api.retryTranscription);
   if (!detail) return <p className="results-label muted" role="status">Loading the conversation…</p>;
   if (detail.patientId !== space.id) return <EmptyState title="This conversation belongs to a different patient space." description="Select the matching patient space to review its conversation." />;
-  return <DetailView conversation={detail.conversation} turns={detail.turns} audioUrl={detail.audioUrl} savedMemories={detail.memories} patient={patient} />;
+  return <DetailView conversation={detail.conversation} turns={detail.turns} audioUrl={detail.audioUrl} savedMemories={detail.memories} patient={patient} onRetry={() => retryTranscription({ conversationId: id })} />;
 }
 
-function DetailView({ conversation, turns, audioUrl, loading, patient, savedMemories }: { conversation: Conversation; turns: TranscriptTurn[]; audioUrl: string | null; loading?: boolean; patient: boolean; savedMemories?: Memory[] }) {
+function DetailView({ conversation, turns, audioUrl, loading, patient, savedMemories, onRetry }: { conversation: Conversation; turns: TranscriptTurn[]; audioUrl: string | null; loading?: boolean; patient: boolean; savedMemories?: Memory[]; onRetry?: () => Promise<unknown> }) {
   const { space, mode, deleteConversation } = useWorkspace();
   const router = useRouter();
   const audio = useRef<HTMLAudioElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const base = patient ? "/patient" : "/family";
   const memories = savedMemories ?? space.memories.filter((memory) => memory.conversationId === conversation.id);
   return <>
     <Link className="back-link" href={patient ? "/patient/memories" : "/family/conversations"}><ArrowLeft size={16} />All conversations</Link>
-    <header className="detail-heading"><div><p className="eyebrow">{dateLabel(localDate(conversation.startedAt, space.timezone))} · {clockLabel(conversation.startedAt, space.timezone)}</p><h1>{conversation.title}</h1><div className="detail-meta"><StatusPill state={conversation.state} /><span>{Math.round(conversation.duration / 60)} min</span><span>{turns.length} speaker turns</span>{conversation.synthetic && <span>Synthetic transcript</span>}</div></div>{space.capabilities.includes("evidence:delete") && <button className="btn btn-quiet delete-trigger" onClick={() => dialog.current?.showModal()}><Trash2 size={15} />Delete</button>}</header>
+    <header className="detail-heading"><div><p className="eyebrow">{dateLabel(localDate(conversation.startedAt, space.timezone))} · {clockLabel(conversation.startedAt, space.timezone)}</p><h1>{conversation.title}</h1><div className="detail-meta"><StatusPill state={conversation.state} /><span>{Math.round(conversation.duration / 60)} min</span><span>{turns.length} speaker turns</span>{conversation.synthetic && <span>Synthetic transcript</span>}</div></div><div className="detail-heading-actions">{conversation.state === "failed" && conversation.duration <= 30 && audioUrl && onRetry && space.capabilities.includes("recordings:create") && <button type="button" className="btn btn-quiet" disabled={retrying || busy} onClick={async () => { setError(""); setRetrying(true); try { await onRetry(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Transcription could not be retried. Try again."); } finally { setRetrying(false); } }}><RotateCcw size={15} />{retrying ? "Queuing…" : "Retry transcription"}</button>}{space.capabilities.includes("evidence:delete") && <button className="btn btn-quiet delete-trigger" onClick={() => dialog.current?.showModal()}><Trash2 size={15} />Delete</button>}</div></header>
     <div className="transcript-layout"><section className="transcript-main" aria-label="Conversation transcript"><div className="audio-player"><AudioLines size={23} /><div><strong>Original recording</strong><span>{audioUrl ? "Select a timestamp to play from that moment." : conversation.synthetic ? "No audio is attached to this synthetic example." : conversation.state === "queued" ? "Uploaded audio is waiting for the audio worker." : "Audio may be expired, deleted, or unavailable."}</span></div>{audioUrl && <audio ref={audio} controls preload="metadata" src={audioUrl}>Your browser does not support audio playback.</audio>}</div>
       {error && <p className="error-text" role="alert">{error}</p>}
       {turns.length ? <ol className="transcript-turns">{turns.map((turn) => <li id={turn.id} key={turn.id} className={`transcript-turn ${turn.uncertain ? "turn-uncertain" : ""}`}><button className="turn-timestamp mono" disabled={!audioUrl} aria-label={`Play ${turn.speaker} at ${durationLabel(turn.start)}`} onClick={() => { if (audio.current) { audio.current.currentTime = turn.start; void audio.current.play().catch(() => setError("Playback could not start. Use the recording controls to try again.")); } }}>{durationLabel(turn.start)}{audioUrl && <Play size={11} />}</button><div className="turn-content"><p className="turn-speaker eyebrow">{turn.speaker}{turn.uncertain && <span> · Attribution uncertain</span>}</p><p>{turn.text}</p></div></li>)}</ol> : <EmptyState title={loading ? "Loading the transcript…" : conversation.state === "queued" ? "The words are on their way." : "No transcript available yet."} description="No text or speaker identity is invented while processing is incomplete." />}

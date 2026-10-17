@@ -69,8 +69,16 @@ function LiveSpace({ patientId, patients, selectPatient, children }: { patientId
       if (!origin) throw new Error("Convex HTTP URL is not configured.");
       const url = new URL("/audio", origin);
       for (const [key, value] of Object.entries({ sessionId, sequence: segment.sequence, capturedAt: segment.capturedAt, endedAt: segment.endedAt })) url.searchParams.set(key, String(value));
-      const response = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": segment.blob.type }, body: segment.blob, cache: "no-store" });
-      if (!response.ok) throw new Error("Upload failed. Keep this page open and try again.");
+      let response: Response;
+      try {
+        response = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": segment.blob.type }, body: segment.blob, cache: "no-store" });
+      } catch {
+        throw new Error("Could not reach the Convex upload endpoint. Check the Convex HTTP URL, APP_ORIGIN, CORS, and network connection; your audio is still saved on this device.");
+      }
+      if (!response.ok) {
+        const detail = (await response.text().catch(() => "")).trim().slice(0, 180);
+        throw new Error(`Upload failed (HTTP ${response.status})${detail ? `: ${detail}` : ". Your audio is still saved on this device."}`);
+      }
     },
   }}>{children}</WorkspaceContext.Provider>;
 }
@@ -86,7 +94,7 @@ function LiveGate({ children }: { children: ReactNode }) {
   if (authLoading) return <Gate title="Connecting securely…" />;
   if (!isAuthenticated) return <Gate title="Your memory connection needs attention." description="Your account is signed in, but Convex could not authenticate it. Check the Clerk convex JWT template and deployment issuer configuration."><UserButton /></Gate>;
   if (!patients || !family) return <Gate title="Finding your memory space…" />;
-  if (!patients.length && family.profile) return <Gate title="You’re part of the circle." description="Your family account is ready. A patient-space administrator still needs to give your account access. Creating an account or a voice profile never grants access to someone’s memories. Invitation management isn’t connected in this prototype."><div className="button-group"><Link href="/signup/voice" className="btn btn-primary">Manage my voice profile <ArrowRight size={17} /></Link><UserButton /></div></Gate>;
+  if (!patients.length && family.profile) return <Gate title="You’re part of the circle." description="Your family account is ready. Ask a patient-space administrator for a private invitation to join. Creating an account or a voice profile never grants access to someone’s memories."><div className="button-group"><Link href="/signup/voice" className="btn btn-primary">Manage my voice profile <ArrowRight size={17} /></Link><UserButton /></div></Gate>;
   if (!patients.length) return <Onboarding />;
   const patientId = patients.find((patient) => patient.id === selected)?.id ?? patients[0].id;
   return <LiveSpace key={patientId} patientId={patientId} patients={patients} selectPatient={setSelected}>{children}</LiveSpace>;
@@ -106,8 +114,8 @@ function Onboarding() {
     }}>
       <label>Your display name<input name="name" required minLength={2} maxLength={100} placeholder="e.g. Margaret Okafor" /></label>
       <label>Your timezone<input name="timezone" required defaultValue={Intl.DateTimeFormat().resolvedOptions().timeZone} /></label>
-      <div className="notice"><ShieldCheck size={20} /><p>Audio playback expires after 7 days; a periodic job deletes the files. Transcripts remain until deleted. Cloud processing is not end-to-end encrypted. This prototype is not a medical service.</p></div>
-      <label className="check-label"><input type="checkbox" name="consent" required /><span>I understand this processing and consent to test recordings. Everyone in each conversation must also agree.</span></label>
+      <div className="notice"><ShieldCheck size={20} /><p>Recordings are sent to Sarvam AI for transcription. If you choose spoken playback, the answer text is sent to Sarvam AI for speech synthesis. Audio playback expires after 7 days; transcripts remain until deleted. Cloud processing is not end-to-end encrypted. This prototype is not a medical service.</p></div>
+      <label className="check-label"><input type="checkbox" name="consent" required /><span>I understand that recordings are processed by Sarvam AI and consent to test recordings. Everyone in each conversation must also agree.</span></label>
       {error && <p role="alert" className="error-text">{error}</p>}
       <button className="btn btn-primary" disabled={busy}>{busy ? "Creating…" : "Create my space"}<ArrowRight size={17} /></button>
     </form>

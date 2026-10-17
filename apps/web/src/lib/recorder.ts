@@ -1,6 +1,7 @@
 import type { SegmentUpload } from "@/components/providers";
 
-export const SEGMENT_MS = 45_000;
+// Saaras v4's realtime upload accepts clips up to 30 seconds; leave room for timer jitter.
+export const SEGMENT_MS = 25_000;
 export const MAX_PENDING_SEGMENTS = 3;
 const MAX_LOCAL_BYTES = 20_000_000;
 export const MIME_CANDIDATES = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
@@ -188,8 +189,8 @@ export class ForegroundRecorder {
       await this.adapter.uploadSegment(next.sessionId, next);
       URL.revokeObjectURL(next.url);
       this.update({ segments: this.snapshot.segments.filter((segment) => segment !== next), uploaded: this.snapshot.uploaded + 1 });
-    } catch {
-      next.error = "Upload failed. Keep this page open and retry.";
+    } catch (cause) {
+      next.error = cause instanceof Error ? cause.message : "Upload failed. Your audio is still saved on this device.";
       this.update({ segments: [...this.snapshot.segments] });
       if (next.attempts < 3) this.retryTimer = setTimeout(() => { next.error = undefined; void this.drain(); }, next.attempts * 2000);
     } finally {

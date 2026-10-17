@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useQuery } from "convex/react";
-import { ArrowRight, ArrowUp, AudioLines, CalendarDays, MessageCircle, Sparkles, X } from "lucide-react";
+import { useAction, useQuery } from "convex/react";
+import { ArrowRight, ArrowUp, AudioLines, CalendarDays, MessageCircle, Sparkles, Volume2, X } from "lucide-react";
 import type { RecallAnswer } from "@hale/contracts";
 import { recallDemo } from "@hale/contracts/recall";
 import { dateLabel, durationLabel, isLocalDate, resolveDayQuestion } from "@hale/contracts/time";
@@ -63,7 +63,41 @@ function AskThread({ patient, day }: { patient: boolean; day?: string }) {
 
 function LiveAnswer({ patientId, exchange, base }: { patientId: string; exchange: Exchange; base: string }) {
   const answer = useQuery(api.recall, { patientId, question: exchange.question, day: exchange.day });
-  return answer ? <AnswerBody answer={answer} base={base} /> : <p role="status">Looking through your recorded words…</p>;
+  return answer ? <><AnswerBody answer={answer} base={base} /><SarvamSpeech patientId={patientId} question={exchange.question} day={exchange.day} text={answer.text} /></> : <p role="status">Looking through your recorded words…</p>;
+}
+
+function SarvamSpeech({ patientId, question, day, text }: { patientId: string; question: string; day?: string; text: string }) {
+  const speak = useAction(api.speakAnswer);
+  const [busy, setBusy] = useState(false);
+  const [playback, setPlayback] = useState<{ url: string; expiresAt: number } | null>(null);
+  const [error, setError] = useState("");
+  const tooLong = text.length > 2_500;
+
+  async function prepareSpeech() {
+    setBusy(true);
+    setError("");
+    setPlayback(null);
+    try {
+      setPlayback(await speak({ patientId, question, day, languageCode: "en-IN" }));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Sarvam could not prepare speech. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="sarvam-speech">
+    <button className="btn btn-quiet sarvam-speech-button" type="button" disabled={busy || tooLong} onClick={() => void prepareSpeech()}>
+      <Volume2 size={16} />{busy ? "Preparing Sarvam audio…" : "Listen · Sarvam English voice"}
+    </button>
+    <p className="small muted">The answer text is sent to Sarvam AI to create speech. Temporary audio is deleted after five minutes.</p>
+    {tooLong && <p className="small muted">This answer is too long for one Sarvam speech request.</p>}
+    {error && <p className="error-text" role="alert">{error}</p>}
+    {busy && <p className="small" role="status" aria-live="polite">Preparing audio with Sarvam AI…</p>}
+    {playback && <audio className="sarvam-speech-audio" controls preload="none" src={playback.url} onError={() => setError("This temporary audio is unavailable or has expired. Prepare it again to listen.")}>
+      Your browser does not support audio playback.
+    </audio>}
+  </div>;
 }
 
 function AnswerBody({ answer, base, checkLoadedSources = false }: { answer: RecallAnswer; base: string; checkLoadedSources?: boolean }) {

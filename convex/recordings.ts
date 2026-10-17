@@ -1,7 +1,10 @@
+import { makeFunctionReference } from "convex/server";
 import { v, ConvexError } from "convex/values";
 import { mutation, internalMutation, internalQuery } from "./lib/functions";
 import { requireMember, requireRecordingConsent } from "./authz";
 import { localDate } from "@hale/contracts/time";
+
+const transcribeRef = makeFunctionReference<"action">("transcriptions:transcribe");
 
 export const authorizeUpload = internalQuery({
   args: { sessionId: v.id("recordingSessions") },
@@ -57,13 +60,15 @@ export const acceptChunk = internalMutation({
       if (existing.deletedAt) throw new ConvexError("This evidence has been deleted.");
       return { chunkId: existing._id, duplicate: true };
     }
-    const chunkId = await ctx.db.insert("audioChunks", { ...args, patientId: session.patientId, state: "queued", expiresAt: Date.now() + patient.audioRetentionDays * 86_400_000 });
-    await ctx.db.insert("processingJobs", { patientId: session.patientId, chunkId, state: "queued", createdAt: Date.now() });
+    const now = Date.now();
+    const chunkId = await ctx.db.insert("audioChunks", { ...args, patientId: session.patientId, state: "queued", expiresAt: now + patient.audioRetentionDays * 86_400_000 });
+    const jobId = await ctx.db.insert("processingJobs", { patientId: session.patientId, chunkId, state: "queued", attempts: 0, createdAt: now, updatedAt: now });
     await ctx.db.insert("conversations", {
       patientId: session.patientId, chunkId, title: "New recording", summary: "Audio uploaded. Waiting for the audio worker; no transcript has been generated yet.",
       startedAt: args.capturedAt, duration: (args.endedAt - args.capturedAt) / 1000,
       localDate: localDate(args.capturedAt, session.timezone), people: [], state: "queued",
     });
+    await ctx.scheduler.runAfter(0, transcribeRef, { jobId });
     return { chunkId, duplicate: false };
   },
 });

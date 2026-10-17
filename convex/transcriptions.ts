@@ -8,7 +8,7 @@ import {
   transcribeAudio,
   SarvamApiError,
 } from "./lib/sarvam";
-import { requireMember } from "./authz";
+import { hasExternalAIConsent, requireMember } from "./authz";
 import { internalAction, internalMutation, internalQuery, mutation, type MutationCtx } from "./lib/functions";
 import { conversationForChunk, refreshLiveConversation, settleLiveChunk } from "./lib/liveConversations";
 
@@ -21,6 +21,7 @@ const scheduleBatchPollRef = makeFunctionReference<"mutation">("transcriptions:s
 const readBatchJobRef = makeFunctionReference<"query">("transcriptions:readBatchJob");
 const pollBatchRef = makeFunctionReference<"action">("transcriptions:pollBatch");
 const speakerMatchingRef = makeFunctionReference<"action">("speakerMatching:process");
+const detectEventsRef = makeFunctionReference<"action">("eventDetection:processChunk");
 
 const MAX_PROVIDER_SEGMENTS = 5_000;
 const MAX_TURNS = 500;
@@ -107,6 +108,21 @@ export const claim = internalMutation({
       }
       return null;
     }
+    if (!await hasExternalAIConsent(ctx, job.patientId)) {
+      const now = Date.now();
+      await deleteTemporaryAudio(ctx, chunk._id, chunk.storageId);
+      await ctx.db.patch(chunk._id, { state: "failed" });
+      await ctx.db.patch(jobId, {
+        state: "failed", providerJobId: undefined, generation: (job.generation ?? 0) + 1,
+        error: "External AI processing is disabled by the patient.", updatedAt: now,
+      });
+      await failSpeakerJob(ctx, chunk._id, now, "External AI processing is disabled by the patient.");
+      if (conversation.sessionId) await settleLiveChunk(ctx, conversation, "failed");
+      else await ctx.db.patch(conversation._id, {
+        state: "failed", summary: "No transcript was created because external AI processing is disabled. Temporary audio was deleted.",
+      });
+      return null;
+    }
     if (!chunk.storageId || chunk.expiresAt <= Date.now()) {
       const now = Date.now();
       await ctx.db.patch(jobId, { state: "failed", providerJobId: undefined, generation: (job.generation ?? 0) + 1, error: "Audio is no longer available.", updatedAt: now });
@@ -149,6 +165,21 @@ export const complete = internalMutation({
     const chunk = await ctx.db.get(job.chunkId);
     const conversation = chunk ? await conversationForChunk(ctx, chunk) : null;
     if (!chunk || chunk.patientId !== job.patientId || chunk.deletedAt || !conversation || conversation.patientId !== job.patientId || conversation.deletedAt) return false;
+    if (!await hasExternalAIConsent(ctx, job.patientId)) {
+      const now = Date.now();
+      await deleteTemporaryAudio(ctx, chunk._id, chunk.storageId);
+      await ctx.db.patch(chunk._id, { state: "failed" });
+      await ctx.db.patch(job._id, {
+        state: "failed", providerJobId: undefined, generation: (job.generation ?? 0) + 1,
+        error: "External AI processing consent was withdrawn.", updatedAt: now,
+      });
+      await failSpeakerJob(ctx, chunk._id, now, "External AI processing consent was withdrawn.");
+      if (conversation.sessionId) await settleLiveChunk(ctx, conversation, "failed");
+      else await ctx.db.patch(conversation._id, {
+        state: "failed", summary: "Transcript processing stopped because external AI consent was withdrawn. Temporary audio was deleted.",
+      });
+      return false;
+    }
     const chunkDuration = (chunk.endedAt - chunk.capturedAt) / 1000;
     if ((!args.turns.length && !conversation.sessionId) || args.turns.length > MAX_TURNS || args.turns.some((turn) =>
       !Number.isFinite(turn.start) || !Number.isFinite(turn.end) || turn.start < 0 || turn.end <= turn.start || turn.end > chunkDuration + 1 ||
@@ -157,8 +188,9 @@ export const complete = internalMutation({
 
     const now = Date.now();
     const offset = conversation.sessionId ? (chunk.capturedAt - conversation.startedAt) / 1000 : 0;
+    const committedTurnIds: GenericId<"transcriptTurns">[] = [];
     for (const turn of args.turns) {
-      await ctx.db.insert("transcriptTurns", {
+      const turnId = await ctx.db.insert("transcriptTurns", {
         patientId: job.patientId,
         conversationId: conversation._id,
         chunkId: chunk._id,
@@ -168,9 +200,18 @@ export const complete = internalMutation({
         text: turn.text,
         uncertain: true,
       });
+      committedTurnIds.push(turnId);
     }
     await ctx.db.patch(job._id, { state: "ready", error: undefined, providerJobId: undefined, updatedAt: now });
     await ctx.db.patch(chunk._id, { state: "ready" });
+    if (committedTurnIds.length) {
+      await ctx.scheduler.runAfter(0, detectEventsRef, {
+        patientId: job.patientId,
+        conversationId: conversation._id,
+        chunkId: chunk._id,
+        turnIds: committedTurnIds,
+      });
+    }
     if (conversation.sessionId) {
       await deleteTemporaryAudio(ctx, chunk._id, chunk.storageId);
       await settleLiveChunk(ctx, conversation, "ready");
@@ -282,6 +323,7 @@ export const retry = mutation({
     const conversation = await ctx.db.get(conversationId);
     if (!conversation || conversation.deletedAt) throw new ConvexError("Conversation unavailable.");
     await requireMember(ctx, conversation.patientId, "recordings:create");
+    if (!await hasExternalAIConsent(ctx, conversation.patientId)) throw new ConvexError("Enable external AI processing in Privacy & Security before retrying transcription.");
     const chunk = await ctx.db.get(conversation.chunkId);
     const job = await ctx.db.query("processingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", conversation.chunkId)).unique();
     if (!chunk || chunk.patientId !== conversation.patientId || chunk.deletedAt || !chunk.storageId || chunk.expiresAt <= Date.now() || !job || job.patientId !== conversation.patientId) {
@@ -359,6 +401,25 @@ export const setBatchJob = internalMutation({
   handler: async (ctx, { jobId, generation, providerJobId }) => {
     const job = await ctx.db.get(jobId);
     if (!job || job.state !== "processing" || job.generation !== generation) return null;
+    if (!await hasExternalAIConsent(ctx, job.patientId)) {
+      const chunk = await ctx.db.get(job.chunkId);
+      const now = Date.now();
+      if (chunk) {
+        await deleteTemporaryAudio(ctx, chunk._id, chunk.storageId);
+        await ctx.db.patch(chunk._id, { state: "failed" });
+        const conversation = await conversationForChunk(ctx, chunk);
+        if (conversation && !conversation.deletedAt) {
+          const speakerJob = await ctx.db.query("speakerMatchingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", chunk._id)).unique();
+          if (speakerJob && ["queued", "processing"].includes(speakerJob.state)) {
+            await ctx.db.patch(speakerJob._id, { state: "failed", providerJobId: undefined, generation: speakerJob.generation + 1, candidates: undefined, error: "External AI processing consent was withdrawn.", updatedAt: now });
+          }
+          if (conversation.sessionId) await settleLiveChunk(ctx, conversation, "failed");
+          else await ctx.db.patch(conversation._id, { state: "failed", summary: "Transcript processing stopped because external AI consent was withdrawn. Temporary audio was deleted." });
+        }
+      }
+      await ctx.db.patch(jobId, { state: "failed", providerJobId: undefined, generation: generation + 1, error: "External AI processing consent was withdrawn.", updatedAt: now });
+      return null;
+    }
     await ctx.db.patch(jobId, { providerJobId, updatedAt: Date.now() });
     await ctx.scheduler.runAfter(5_000, pollBatchRef, { jobId, generation, attempt: 0 });
     return null;
@@ -370,6 +431,7 @@ export const scheduleBatchPoll = internalMutation({
   handler: async (ctx, { jobId, generation, attempt }) => {
     const job = await ctx.db.get(jobId);
     if (!job || job.state !== "processing" || job.generation !== generation || !job.providerJobId) return null;
+    if (!await hasExternalAIConsent(ctx, job.patientId)) return null;
     await ctx.db.patch(jobId, { updatedAt: Date.now() });
     await ctx.scheduler.runAfter(batchPollDelayMs(attempt), pollBatchRef, { jobId, generation, attempt });
     return null;
@@ -381,6 +443,7 @@ export const readBatchJob = internalQuery({
   handler: async (ctx, { jobId, generation }) => {
     const job = await ctx.db.get(jobId);
     if (!job || job.state !== "processing" || job.generation !== generation || !job.providerJobId) return null;
+    if (!await hasExternalAIConsent(ctx, job.patientId)) return null;
     const chunk = await ctx.db.get(job.chunkId);
     if (!chunk || chunk.deletedAt || chunk.patientId !== job.patientId) return null;
     return { providerJobId: job.providerJobId, durationSeconds: (chunk.endedAt - chunk.capturedAt) / 1000 };

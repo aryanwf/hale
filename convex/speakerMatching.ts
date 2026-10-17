@@ -4,6 +4,7 @@ import { VOICE_MATCHING_POLICY } from "@hale/contracts/voice";
 import { PyannoteApiError, pyannoteRequest } from "./lib/pyannote";
 import { matchTranscriptTurns, type MatchCandidate } from "./lib/speakerMatching";
 import { internalAction, internalMutation, internalQuery, type DataModel, type MutationCtx } from "./lib/functions";
+import { hasExternalAIConsent } from "./authz";
 
 const processRef = makeFunctionReference<"action">("speakerMatching:process");
 const pollRef = makeFunctionReference<"action">("speakerMatching:poll");
@@ -36,6 +37,10 @@ export const claim = internalMutation({
     ]);
     if (!chunk || chunk.patientId !== job.patientId || chunk.deletedAt || !conversation || conversation.patientId !== job.patientId || conversation.deletedAt || transcription?.state !== "ready") {
       await finishWithoutMatches(ctx, job, "failed", "Speaker identification could not use this source.");
+      return null;
+    }
+    if (!await hasExternalAIConsent(ctx, job.patientId)) {
+      await finishWithoutMatches(ctx, job, "skipped", "Speaker matching stopped because external AI consent is disabled.");
       return null;
     }
     if (!chunk.storageId || chunk.expiresAt <= Date.now()) {
@@ -83,6 +88,10 @@ export const setProviderJob = internalMutation({
   handler: async (ctx, { jobId, generation, providerJobId }) => {
     const job = await ctx.db.get(jobId);
     if (!job || job.state !== "processing" || job.generation !== generation) return null;
+    if (!await hasExternalAIConsent(ctx, job.patientId)) {
+      await finishWithoutMatches(ctx, job, "skipped", "Speaker matching stopped because external AI consent was withdrawn.");
+      return null;
+    }
     await ctx.db.patch(jobId, { providerJobId, updatedAt: Date.now() });
     await ctx.scheduler.runAfter(5_000, pollRef, { jobId, generation, attempt: 0 });
     return null;
@@ -94,6 +103,7 @@ export const schedulePoll = internalMutation({
   handler: async (ctx, { jobId, generation, attempt }) => {
     const job = await ctx.db.get(jobId);
     if (!job || job.state !== "processing" || job.generation !== generation || !job.providerJobId) return null;
+    if (!await hasExternalAIConsent(ctx, job.patientId)) return null;
     await ctx.db.patch(jobId, { updatedAt: Date.now() });
     await ctx.scheduler.runAfter(pollDelayMs(attempt), pollRef, { jobId, generation, attempt });
     return null;
@@ -105,6 +115,7 @@ export const read = internalQuery({
   handler: async (ctx, { jobId, generation }) => {
     const job = await ctx.db.get(jobId);
     if (!job || job.state !== "processing" || job.generation !== generation || !job.providerJobId) return null;
+    if (!await hasExternalAIConsent(ctx, job.patientId)) return null;
     const [turns, chunk] = await Promise.all([
       ctx.db.query("transcriptTurns").withIndex("by_conversation", (q) => q.eq("conversationId", job.conversationId)).take(500),
       ctx.db.get(job.chunkId),
@@ -134,6 +145,10 @@ export const complete = internalMutation({
       ctx.db.query("processingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", job.chunkId)).unique(),
     ]);
     if (!chunk || chunk.deletedAt || !conversation || conversation.deletedAt || conversation.patientId !== job.patientId || transcription?.state !== "ready") return false;
+    if (!await hasExternalAIConsent(ctx, job.patientId)) {
+      await finishWithoutMatches(ctx, job, "skipped", "Speaker matching stopped because external AI consent was withdrawn.");
+      return false;
+    }
 
     const byLabel = new Map((job.candidates ?? []).map((candidate) => [candidate.label, candidate]));
     const matchedPeople = new Set<GenericId<"people">>();

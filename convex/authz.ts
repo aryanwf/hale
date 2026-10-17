@@ -3,6 +3,7 @@ import type { Capability } from "@hale/contracts";
 import type { QueryCtx } from "./lib/functions";
 
 const DELETED_ACCOUNT_MESSAGE = "Your Hale account was deleted. Finish deleting your sign-in account or create a new account.";
+export const EXTERNAL_AI_POLICY_VERSION = "2026-10-17-external-ai-v1";
 
 export async function hashIdentity(tokenIdentifier: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(tokenIdentifier));
@@ -38,11 +39,32 @@ export async function requireMember(ctx: QueryCtx, patientId: GenericId<"patient
   return { identity, membership, patient };
 }
 
-export async function requireRecordingConsent(ctx: QueryCtx, patientId: GenericId<"patients">, subject: string) {
-  const consents = await ctx.db.query("consents").withIndex("by_patient_subject", (q) =>
-    q.eq("patientId", patientId).eq("subject", subject),
-  ).collect();
-  if (!consents.some((consent) => consent.purpose === "recording" && !consent.revokedAt)) {
+export async function requireRecordingConsent(ctx: QueryCtx, patientId: GenericId<"patients">, subject: string, sessionConsentAt?: number) {
+  const consents = await ctx.db.query("consents").withIndex("by_patient_subject_purpose", (q) =>
+    q.eq("patientId", patientId).eq("subject", subject).eq("purpose", "recording"),
+  ).order("desc").take(100);
+  if (!consents.some((consent) => !consent.revokedAt && (sessionConsentAt === undefined || consent.grantedAt <= sessionConsentAt))) {
     throw new ConvexError("Recording consent is required.");
   }
+}
+
+export async function hasActiveConsent(
+  ctx: QueryCtx,
+  patientId: GenericId<"patients">,
+  subject: string,
+  purpose: string,
+): Promise<boolean> {
+  const consents = await ctx.db.query("consents").withIndex("by_patient_subject_purpose", (q) =>
+    q.eq("patientId", patientId).eq("subject", subject).eq("purpose", purpose),
+  ).order("desc").take(100);
+  return consents.some((consent) => !consent.revokedAt);
+}
+
+export async function hasExternalAIConsent(ctx: QueryCtx, patientId: GenericId<"patients">): Promise<boolean> {
+  const patient = await ctx.db.get(patientId);
+  if (!patient) return false;
+  const consents = await ctx.db.query("consents").withIndex("by_patient_subject_purpose", (q) =>
+    q.eq("patientId", patientId).eq("subject", patient.createdBy).eq("purpose", "external_ai"),
+  ).order("desc").take(100);
+  return consents.some((consent) => !consent.revokedAt && consent.policyVersion === EXTERNAL_AI_POLICY_VERSION);
 }

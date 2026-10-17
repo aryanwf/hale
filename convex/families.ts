@@ -73,3 +73,37 @@ export const link = mutation({
     return null;
   },
 });
+
+export const setCareAccess = mutation({
+  args: { patientId: v.id("patients"), personId: v.id("people"), enabled: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, { patientId, personId, enabled }) => {
+    const { identity, membership } = await requireMember(ctx, patientId, "sharing:manage");
+    if (membership.role !== "patient") throw new ConvexError("Only the patient can manage family Care access.");
+    const person = await ctx.db.get(personId);
+    if (!person || person.patientId !== patientId || !person.linkedSubject) {
+      throw new ConvexError("This family link is unavailable.");
+    }
+    const familyMembership = await ctx.db.query("memberships")
+      .withIndex("by_patient_subject", (q) => q.eq("patientId", patientId).eq("subject", person.linkedSubject!))
+      .unique();
+    if (!familyMembership?.active || familyMembership.role !== "family") {
+      throw new ConvexError("This family link is unavailable.");
+    }
+
+    const capabilities = familyMembership.capabilities.filter((capability) => capability !== "care:manage");
+    if (enabled) capabilities.push("care:manage");
+    if (capabilities.length === familyMembership.capabilities.length && enabled === familyMembership.capabilities.includes("care:manage")) {
+      return null;
+    }
+    await ctx.db.patch(familyMembership._id, { capabilities });
+    await ctx.db.insert("auditEvents", {
+      patientId,
+      actor: identity.subject,
+      operation: enabled ? "family.care_access.enabled" : "family.care_access.disabled",
+      target: personId,
+      timestamp: Date.now(),
+    });
+    return null;
+  },
+});

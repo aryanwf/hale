@@ -31,6 +31,8 @@ async function eraseAccountData(ctx: MutationCtx, subject: string) {
   remove(profiles);
   remove(await ctx.db.query("familyCodes").withIndex("by_subject", (q) => q.eq("subject", subject)).take(READ_LIMIT));
   remove(await ctx.db.query("memberships").withIndex("by_subject", (q) => q.eq("subject", subject)).take(READ_LIMIT));
+  remove(await ctx.db.query("webNotificationSubscriptions").withIndex("by_subject", (q) => q.eq("subject", subject)).take(READ_LIMIT));
+  remove(await ctx.db.query("emergencyContacts").withIndex("by_createdBy", (q) => q.eq("createdBy", subject)).take(READ_LIMIT));
   remove(await ctx.db.query("consents").withIndex("by_subject", (q) => q.eq("subject", subject)).take(READ_LIMIT));
   remove(await ctx.db.query("auditEvents").withIndex("by_actor", (q) => q.eq("actor", subject)).take(READ_LIMIT));
   remove(await ctx.db.query("patientInvitations").withIndex("by_createdBy", (q) => q.eq("createdBy", subject)).take(READ_LIMIT));
@@ -51,11 +53,16 @@ async function eraseAccountData(ctx: MutationCtx, subject: string) {
     remove(await ctx.db.query("memberships").withIndex("by_patient_subject", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
     remove(await ctx.db.query("consents").withIndex("by_patient_subject", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
     remove(await ctx.db.query("people").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
+    remove(await ctx.db.query("webNotificationSubscriptions").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
     remove(await ctx.db.query("patientInvitations").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
     remove(await ctx.db.query("familyCodes").withIndex("by_patientId", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
     remove(await ctx.db.query("recordingSessions").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
     remove(await ctx.db.query("audioChunks").withIndex("by_patientId", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
     remove(await ctx.db.query("processingJobs").withIndex("by_patientId", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
+    remove(await ctx.db.query("emergencyContacts").withIndex("by_patient_createdAt", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
+    remove(await ctx.db.query("careProposals").withIndex("by_patient_createdAt", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
+    remove(await ctx.db.query("careAlerts").withIndex("by_patient_createdAt", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
+    remove(await ctx.db.query("privacySettings").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
     remove(await ctx.db.query("conversations").withIndex("by_patient_date", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
     remove(await ctx.db.query("transcriptTurns").withIndex("by_patientId", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
     remove(await ctx.db.query("memories").withIndex("by_patient_date", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));

@@ -34,10 +34,33 @@ describe("family dashboard to Android bridge", () => {
     expect(await t.withIdentity({ subject: "outsider" }).query(app.api.families.code, {})).toBeNull();
   });
 
-  test("patient enters a formatted code to grant read-only family access", async () => {
+  test("patient enters a formatted code to grant shared-memory access without recording privileges", async () => {
     const { patient, family, patientId, invitation } = await setup();
     await patient.mutation(app.api.families.link, { patientId, code: ` ${invitation.code.match(/.{1,4}/g)?.join("-").toLowerCase()} ` });
     expect(await family.query(app.api.patients.listForRole, { role: "family" })).toMatchObject([{ id: patientId, capabilities: ["memories:read"] }]);
+    expect((await patient.query(app.api.people.list, { patientId })).find((person) => person.linked && !person.isPatient)?.careAccess).toBe(false);
+  });
+
+  test("patient can separately enable and revoke family Care controls", async () => {
+    const { t, patient, family, patientId, invitation } = await setup();
+    await patient.mutation(app.api.families.link, { patientId, code: invitation.code });
+    const person = (await patient.query(app.api.people.list, { patientId })).find((item) => item.linked && !item.isPatient)!;
+    expect(person.careAccess).toBe(false);
+    await expect(t.withIdentity({ subject: "outsider" }).mutation(app.api.families.setCareAccess, {
+      patientId, personId: person.id, enabled: true,
+    })).rejects.toThrow("permission");
+
+    await patient.mutation(app.api.families.setCareAccess, { patientId, personId: person.id, enabled: true });
+    expect((await patient.query(app.api.people.list, { patientId })).find((item) => item.id === person.id)?.careAccess).toBe(true);
+    expect(await family.query(app.api.patients.listForRole, { role: "family" })).toMatchObject([
+      { id: patientId, capabilities: ["memories:read", "care:manage"] },
+    ]);
+
+    await patient.mutation(app.api.families.setCareAccess, { patientId, personId: person.id, enabled: false });
+    expect((await patient.query(app.api.people.list, { patientId })).find((item) => item.id === person.id)?.careAccess).toBe(false);
+    expect(await family.query(app.api.patients.listForRole, { role: "family" })).toMatchObject([
+      { id: patientId, capabilities: ["memories:read"] },
+    ]);
   });
 
   test("patient memberships never appear as family dashboard spaces", async () => {

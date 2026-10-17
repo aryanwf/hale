@@ -23,11 +23,22 @@ export default defineSchema({
   consents: defineTable({
     patientId: v.id("patients"), subject: v.string(), purpose: v.string(),
     policyVersion: v.string(), grantedAt: v.number(), revokedAt: v.optional(v.number()),
-  }).index("by_patient_subject", ["patientId", "subject"]),
+  }).index("by_patient_subject", ["patientId", "subject"])
+    .index("by_patient_subject_purpose", ["patientId", "subject", "purpose"]),
   people: defineTable({
     patientId: v.id("patients"), name: v.string(), relationship: v.string(),
     enrollment: v.union(v.literal("not_enrolled"), v.literal("enrolled"), v.literal("revoked")),
-  }).index("by_patient", ["patientId"]),
+    isPatient: v.optional(v.boolean()),
+    linkedSubject: v.optional(v.string()), familyProfileId: v.optional(v.id("familyProfiles")),
+    voiceConsentAt: v.optional(v.number()), voiceConsentPolicy: v.optional(v.string()),
+  }).index("by_patient", ["patientId"])
+    .index("by_patient_linked_subject", ["patientId", "linkedSubject"]),
+  patientInvitations: defineTable({
+    patientId: v.id("patients"), personId: v.id("people"),
+    tokenHash: v.string(), createdBy: v.string(), createdAt: v.number(), expiresAt: v.number(),
+    acceptedBy: v.optional(v.string()), acceptedAt: v.optional(v.number()), revokedAt: v.optional(v.number()),
+  }).index("by_token_hash", ["tokenHash"])
+    .index("by_patient", ["patientId"]),
   recordingSessions: defineTable({
     patientId: v.id("patients"), subject: v.string(), startedAt: v.number(),
     endedAt: v.optional(v.number()), timezone: v.string(),
@@ -44,8 +55,8 @@ export default defineSchema({
   processingJobs: defineTable({
     patientId: v.id("patients"), chunkId: v.id("audioChunks"),
     state: v.union(v.literal("queued"), v.literal("processing"), v.literal("ready"), v.literal("failed")),
-    error: v.optional(v.string()), createdAt: v.number(),
-  }).index("by_chunk", ["chunkId"]).index("by_state", ["state"]),
+    error: v.optional(v.string()), attempts: v.optional(v.number()), generation: v.optional(v.number()), updatedAt: v.optional(v.number()), createdAt: v.number(),
+  }).index("by_chunk", ["chunkId"]).index("by_state", ["state"]).index("by_state_updated", ["state", "updatedAt"]),
   conversations: defineTable({
     patientId: v.id("patients"), chunkId: v.id("audioChunks"),
     title: v.string(), summary: v.string(), startedAt: v.number(), duration: v.number(),

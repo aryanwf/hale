@@ -22,3 +22,6 @@ __pycache__/
 test-results/
 playwright-report/
 .next-e2e/
+
+# Personal, local-only implementation notes
+/plan.md

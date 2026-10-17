@@ -31,7 +31,7 @@ const appearance = {
   },
 };
 
-function LiveAuth({ signup, patient }: { signup: boolean; patient: boolean }) {
+function LiveAuth({ signup, patient, redirectUrl }: { signup: boolean; patient: boolean; redirectUrl?: string }) {
   const { isLoaded, isSignedIn } = useAuth();
   const destination = patient ? "/patient/today" : "/signup/voice";
   if (!isLoaded) {
@@ -39,7 +39,9 @@ function LiveAuth({ signup, patient }: { signup: boolean; patient: boolean }) {
   }
 
   if (isSignedIn) {
-    const nextStep = signup
+    const nextStep = redirectUrl
+      ? "Your invitation is ready to continue."
+      : signup
       ? patient
         ? "Next, create your own private patient space."
         : "Next, introduce yourself and choose whether to set up your voice."
@@ -50,8 +52,8 @@ function LiveAuth({ signup, patient }: { signup: boolean; patient: boolean }) {
         <ShieldCheck size={28} />
         <h2>You’re signed in.</h2>
         <p className="muted">{nextStep}</p>
-        <Link className="btn btn-primary" href={signup ? destination : "/family/overview"}>
-          {signup ? "Continue setup" : "Open my space"}
+        <Link className="btn btn-primary" href={redirectUrl ?? (signup ? destination : "/family/overview")}>
+          {redirectUrl ? "Continue invitation" : signup ? "Continue setup" : "Open my space"}
           <ArrowRight size={17} />
         </Link>
       </div>
@@ -59,16 +61,30 @@ function LiveAuth({ signup, patient }: { signup: boolean; patient: boolean }) {
   }
 
   return signup
-    ? <SignUp path={patient ? "/signup/patient" : "/signup"} routing="path" signInUrl="/login" forceRedirectUrl={destination} appearance={appearance} />
-    : <SignIn path="/login" routing="path" signUpUrl="/signup" fallbackRedirectUrl="/family/overview" appearance={appearance} />;
+    ? <SignUp path={patient ? "/signup/patient" : "/signup"} routing="path" signInUrl={redirectUrl ? `/login?redirect_url=${encodeURIComponent(redirectUrl)}` : "/login"} forceRedirectUrl={redirectUrl ?? destination} appearance={appearance} />
+    : <SignIn path="/login" routing="path" signUpUrl={redirectUrl ? `/signup?redirect_url=${encodeURIComponent(redirectUrl)}` : "/signup"} forceRedirectUrl={redirectUrl} fallbackRedirectUrl="/family/overview" appearance={appearance} />;
 }
 
 function AuthUnavailable() {
   return <div className="auth-setup-notice" role="status"><LockKeyhole size={24} /><h2>Authentication isn’t configured.</h2><p>Sign-in and account creation require a connected Clerk application and Convex backend. There is no preview login or pretend account.</p><p className="small muted">Configure live mode using the deployment instructions in README.md, then restart the application.</p></div>;
 }
 
-export function AuthPage({ signup = false, patient = false }: { signup?: boolean; patient?: boolean }) {
+function safeInviteRedirect(value?: string) {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return undefined;
+  try {
+    const url = new URL(value, "https://hale.invalid");
+    const tokens = url.searchParams.getAll("token");
+    if (url.origin !== "https://hale.invalid" || url.pathname !== "/join" || url.hash || tokens.length !== 1 || !/^[\da-f]{64}$/i.test(tokens[0])) return undefined;
+    if ([...url.searchParams.keys()].some((key) => key !== "token")) return undefined;
+    return `/join?token=${encodeURIComponent(tokens[0])}`;
+  } catch {
+    return undefined;
+  }
+}
+
+export function AuthPage({ signup = false, patient = false, redirectUrl }: { signup?: boolean; patient?: boolean; redirectUrl?: string }) {
   const live = appMode === "live";
+  const inviteRedirect = safeInviteRedirect(redirectUrl);
   const introDescription = !signup
     ? "Log in to reconnect with the conversations, people, and little moments that matter."
     : patient
@@ -91,8 +107,8 @@ export function AuthPage({ signup = false, patient = false }: { signup?: boolean
         </nav>
       )}
       {!live && <AuthUnavailable />}
-      {live && signup && <LiveAuth signup patient={patient} />}
-      {live && !signup && <LoginPanel patient={patient} />}
+      {live && signup && <LiveAuth signup patient={patient} redirectUrl={inviteRedirect} />}
+      {live && !signup && <LoginPanel patient={patient} redirectUrl={inviteRedirect} />}
       <p className="auth-privacy">
         <ShieldCheck size={15} />
         <span>{signup ? "Joining doesn’t grant access to anyone’s memories. Patient-space permission is always required." : "Your memories stay in your circle. Access is always permission-based."}</span>
@@ -101,7 +117,7 @@ export function AuthPage({ signup = false, patient = false }: { signup?: boolean
   );
 }
 
-function LoginPanel({ patient }: { patient: boolean }) {
+function LoginPanel({ patient, redirectUrl }: { patient: boolean; redirectUrl?: string }) {
   return (
     <section className="auth-login-card" aria-label="Secure sign-in">
       <header className="auth-login-card-heading">
@@ -111,7 +127,7 @@ function LoginPanel({ patient }: { patient: boolean }) {
           <h2>Sign in securely</h2>
         </div>
       </header>
-      <LiveAuth signup={false} patient={patient} />
+      <LiveAuth signup={false} patient={patient} redirectUrl={redirectUrl} />
     </section>
   );
 }

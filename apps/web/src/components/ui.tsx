@@ -17,7 +17,7 @@ export function SectionHeading({ title, href, link }: { title: string; href?: st
 }
 
 export function StatusPill({ state }: { state: Conversation["state"] }) {
-  const label = { ready: "Ready", queued: "Awaiting worker", processing: "Processing", failed: "Processing failed" }[state];
+  const label = { ready: "Ready", queued: "Queued", processing: "Processing", failed: "Could not process" }[state];
   return <span className={`status-pill ${state === "failed" ? "status-error" : ""}`}><span className={state === "ready" ? "status-dot" : "status-ring"} />{label}</span>;
 }
 
@@ -29,7 +29,7 @@ export function PeopleStack({ ids, names = false }: { ids: string[]; names?: boo
 
 export function ConversationList({ conversations, base = "/family", compact = false }: { conversations: Conversation[]; base?: string; compact?: boolean }) {
   const { space, today } = useWorkspace();
-  if (!conversations.length) return <EmptyState title="A little space for new memories." description="There are no recordings here yet. That doesn’t mean nothing happened." />;
+  if (!conversations.length) return <EmptyState title="No conversations yet" description="There are no recordings available here. That doesn’t mean nothing happened." />;
   return <div className={`conversation-list ${compact ? "conversation-list-compact" : ""}`}>
     {!compact && <div className="conversation-table-head eyebrow"><span>WHEN</span><span>CONVERSATION</span><span>PEOPLE</span><span>STATUS</span><span /></div>}
     {conversations.map((conversation) => {

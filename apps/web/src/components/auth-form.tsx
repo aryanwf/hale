@@ -49,7 +49,7 @@ function LiveAuth({ signup }: { signup: boolean }) {
         <h2>You’re signed in.</h2>
         <p className="muted">{nextStep}</p>
         <Link className="btn btn-primary" href={signup ? destination : "/family/overview"}>
-          {signup ? "Continue setup" : "Open my space"}
+          {signup ? "Continue" : "Open my space"}
           <ArrowRight size={17} />
         </Link>
       </div>
@@ -74,9 +74,9 @@ export function AuthPage({ signup = false }: { signup?: boolean }) {
   return (
     <AuthShell signup={signup}>
       <div className="auth-intro">
-        <p className="eyebrow">{signup ? "A LITTLE CLOSER, EVEN FROM AFAR" : "A FAMILIAR PLACE TO RETURN TO"}</p>
+        <p className="eyebrow">{signup ? "CREATE YOUR ACCOUNT" : "SIGN IN TO HALE"}</p>
         <h1>
-          {signup ? <>Good memories.<br /><span>Better together.</span></> : <>Welcome back.<br /><span>Make yourself at home.</span></>}
+          {signup ? <>Create a family<br /><span>account.</span></> : <>Welcome back.<br /><span>Sign in to continue.</span></>}
         </h1>
         <p>{introDescription}</p>
       </div>

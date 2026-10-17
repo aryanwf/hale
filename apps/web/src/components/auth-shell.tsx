@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, AudioLines, Check, Leaf, LockKeyhole } from "lucide-react";
+import { ArrowUpRight, Check, Leaf, LockKeyhole } from "lucide-react";
 import type { ReactNode } from "react";
 
 export function AuthShell({ children, signup = false, step = 0 }: { children: ReactNode; signup?: boolean; step?: number }) {
@@ -8,15 +8,9 @@ export function AuthShell({ children, signup = false, step = 0 }: { children: Re
     <aside className="auth-story" aria-label="About Hale">
       <Link href="/" className="wordmark"><Leaf size={26} strokeWidth={1.7} aria-hidden />hale.</Link>
       <div className="auth-story-body">
-        <p className="eyebrow">THE LITTLE THINGS ARE THE BIG THINGS.</p>
-        <h2>Some moments<br />deserve to<br /><span>stay with you.</span></h2>
-        <p>A familiar voice. A shared story. A little reminder of a day well spent. Keep the people and moments that matter within reach.</p>
-        <div className="auth-memory" aria-label="Illustration of a saved conversation, not a real recording">
-          <div className="auth-memory-top"><span className="auth-memory-icon"><AudioLines size={19} /></span><span className="eyebrow">A MOMENT TO KEEP</span><span className="mono">00:24</span></div>
-          <div className="auth-wave" aria-hidden>{Array.from({ length: 45 }, (_, i) => <i key={i} style={{ height: `${Math.round(8 + Math.abs(Math.sin(i * 1.9) * Math.cos(i * .37)) * 39)}px` }} />)}</div>
-          <p>“We should do this more often.”</p>
-          <span className="auth-memory-caption">The conversations that bring us closer.</span>
-        </div>
+        <p className="eyebrow">CARE CONVERSATIONS, KEPT CLOSE</p>
+        <h2>Keep important<br />conversations<br /><span>within reach.</span></h2>
+        <p>Hale helps you return to recorded words and the details that matter. Only people with permission can see a patient space.</p>
       </div>
       <div className="auth-story-footer"><LockKeyhole size={14} /><span>Personal memories. Shared only with permission.</span></div>
     </aside>

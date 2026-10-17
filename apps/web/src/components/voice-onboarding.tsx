@@ -53,15 +53,15 @@ function VoiceFlow({ demo = false, configured, profile, onIntroduce, onUpload, o
   return <AuthShell signup step={done ? 2 : 1}>
     {done ? <div className="voice-complete">
       <span className="voice-complete-icon"><CheckCircle2 size={31} strokeWidth={1.5} /></span>
-      <p className="eyebrow">A LITTLE MORE CONNECTED</p>
-      <h1>{skipped ? <>Your voice.<br /><span>Your choice.</span></> : <>A familiar voice.<br /><span>A lovely beginning.</span></>}</h1>
+      <p className="eyebrow">VOICE PROFILE</p>
+      <h1>{skipped ? <>Voice setup<br /><span>skipped.</span></> : <>Voice setup<br /><span>complete.</span></>}</h1>
       <p>{skipped ? "Voice setup is optional. You can come back here whenever you’re ready." : demo ? "You’ve tried the voice-setup experience. Your sample has been discarded. No account or voiceprint was created." : "Your voiceprint has been created and saved privately. Your original sample has been removed from Hale’s storage."}</p>
       <div className="voice-next-note"><ShieldCheck size={20} /><p>{demo ? "Next, explore a fictional family space with synthetic memories." : "Return to your family dashboard to get your family code. Your loved one enters it on Android to approve sharing. Voice setup never grants access to their memories."}</p></div>
       <Link href="/family/overview" className="btn btn-primary auth-submit">{demo ? "Return to workspace" : "Continue to my account"}<ArrowRight size={17} /></Link>
       {skipped ? <button className="text-link voice-secondary" onClick={() => { setDemoDone(undefined); setReopen(true); }}>Set up my voice<Mic size={15} /></button> : !demo && <button disabled={busy} className="text-link voice-secondary voice-remove" onClick={() => void run(async () => { await onRevoke?.(); setConsent(false); setReopen(true); })}><Trash2 size={15} />Delete my voice profile & withdraw consent</button>}
       {error && <p className="error-text" role="alert">{error}</p>}
     </div> : <>
-      <div className="auth-intro voice-intro"><p className="eyebrow">{hasProfile ? "A VOICE THEY KNOW. A CONNECTION THAT STAYS." : "FIRST, A LITTLE INTRODUCTION"}</p><h1>{hasProfile ? <>Let’s put a voice<br /><span>to your name.</span></> : <>Every circle starts<br /><span>with someone like you.</span></>}</h1><p>{hasProfile ? "A short sample can help Hale recognize your voice in future conversations. It’s optional, and it’s never used to log you in." : "Tell us who you are. This creates your own family profile, not access to someone else’s memories."}</p></div>
+      <div className="auth-intro voice-intro"><p className="eyebrow">{hasProfile ? "OPTIONAL VOICE PROFILE" : "FAMILY PROFILE"}</p><h1>{hasProfile ? <>Set up your<br /><span>voice profile.</span></> : <>Introduce<br /><span>yourself.</span></>}</h1><p>{hasProfile ? "A voice sample creates a private profile. It is optional and is not used to sign in. Speaker matching is not connected yet." : "Create your own family profile. This does not grant access to another person’s memories."}</p></div>
       {demo && <div className="auth-demo-note"><FlaskConical size={17} /><p><strong>Local preview only.</strong> Recording uses your microphone, but nothing is uploaded or saved after you leave.</p></div>}
       {!hasProfile ? <form className="auth-form" onSubmit={(event) => { event.preventDefault(); void run(async () => { await onIntroduce?.(name, relationship); setIntroduced(true); }); }}>
         <label>Your full name<input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" minLength={2} maxLength={100} required disabled={!hydrated || busy} placeholder="e.g. Daniel Okafor" /></label>

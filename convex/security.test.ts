@@ -15,7 +15,7 @@ const app = builders.defineModules({ patients, recordings, conversations, privac
 async function setup() {
   const t = app.createTest();
   const patient = t.withIdentity({ subject: "patient-a", issuer: "https://test.clerk.accounts.dev" });
-  const patientId = await patient.mutation(app.api.patients.create, { name: "Fictional Patient", timezone: "America/New_York", recordingConsent: true });
+  const patientId = await patient.mutation(app.api.patients.create, { name: "Fictional Patient", timezone: "America/New_York", recordingConsent: true, externalAIConsent: true });
   const sessionId = await patient.mutation(app.api.recordings.start, { patientId, participantsConsented: true });
   const storageId = await t.run((ctx) => ctx.storage.store(new Blob(["consented test bytes"], { type: "audio/mp4" })));
   const capturedAt = Date.now();

@@ -23,7 +23,12 @@ export function MoreScreen() {
     if (!config.webUrl) { Alert.alert("Account settings unavailable", "Open the Hale website to delete your account."); return; }
     void Linking.openURL(new URL("/account/delete", config.webUrl).toString()).catch(() => Alert.alert("Couldn’t open account settings", "Open the Hale website and go to Delete account in settings."));
   }
+  function openPrivacyCenter() {
+    if (!config.webUrl) { Alert.alert("Privacy center unavailable", "Set EXPO_PUBLIC_WEB_URL to manage privacy and security settings."); return; }
+    void Linking.openURL(new URL("/privacy", config.webUrl).toString()).catch(() => Alert.alert("Couldn’t open Privacy & Security", "Open the Hale website and choose Privacy & security in Settings."));
+  }
   return <Page eyebrow="SETTINGS" title="Your space" description="People, privacy, recordings, and account settings.">
+    <View style={styles.card}><Text style={styles.eyebrow}>PRIVACY &amp; SECURITY</Text><Text style={styles.heading}>Your privacy controls</Text><Text style={styles.small}>Manage recording consent, external AI processing, family access, data retention, access history and exports.</Text><Button title="Open Privacy & Security Center ↗" tone="secondary" disabled={busy} onPress={openPrivacyCenter} /></View>
     {mode === "live" && <FamilyLink patientId={space.id} disabled={busy} />}
     <View style={styles.stack}>
       <Text style={styles.heading}>People</Text>
@@ -48,13 +53,13 @@ export function MoreScreen() {
     <View style={styles.card}>
       <Text style={styles.eyebrow}>DATA AND PRIVACY</Text>
       <Text style={styles.heading}>What Hale stores</Text>
-       <Text style={styles.small}>Uploaded audio · temporary for transcription and selected speaker matching, then deleted; stalled processing expires in about 24 hours</Text>
+       <Text style={styles.small}>Uploaded audio · external processing is off until you enable it; when enabled, audio is temporary for transcription and selected speaker matching, then deleted. Stalled processing expires in about 24 hours.</Text>
        <Text style={styles.small}>Transcripts and memories · until you delete the conversation</Text>
         <Text style={styles.small}>Unsent temporary audio · up to five minutes on this device until upload or discard. Recording stops if this queue fills.</Text>
       <View style={styles.divider} />
       <Text style={styles.small}>{pendingCount} segments saved locally for this account and patient space.{needsFinalization ? " Finishing the previous session." : ""}</Text>
       <Text style={styles.small}>Local audio is not app-encrypted. Uninstalling Hale or clearing app data removes unsent files. An interrupted file may be incomplete.</Text>
-       <Text style={styles.small}>Cloud processing is not end-to-end encrypted. Providers receive audio to perform transcription and optional speaker matching; their independent retention is governed by their terms.</Text>
+        <Text style={styles.small}>Cloud processing is not end-to-end encrypted. If you enable external AI processing, providers receive audio for transcription and optional speaker matching; their independent retention is governed by their terms.</Text>
     </View>
 
     <View style={styles.card}>

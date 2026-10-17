@@ -27,7 +27,30 @@ async function setup() {
     const conversationId = await ctx.db.insert("conversations", { patientId, chunkId, title: "A conversation", summary: "A shared moment", startedAt: 0, duration: 1, localDate: "2026-10-17", people: [person!._id], state: "processing" });
     const turnId = await ctx.db.insert("transcriptTurns", { patientId, conversationId, personId: person!._id, speaker: "Daniel", start: 0, end: 1, text: "Let's have lunch.", uncertain: false });
     const memoryId = await ctx.db.insert("memories", { patientId, conversationId, kind: "plan", title: "Lunch", text: "A plan for lunch", localDate: "2026-10-17", people: [person!._id], turnIds: [turnId] });
-    return { storageId, sessionId, chunkId, jobId, conversationId, turnId, memoryId, personId: person!._id };
+    const contactId = await ctx.db.insert("emergencyContacts", {
+      patientId, createdBy: "user_patient", name: "Emergency Contact", email: "contact@example.com", enabled: true, createdAt: 0,
+    });
+    const familyContactId = await ctx.db.insert("emergencyContacts", {
+      patientId, createdBy: "user_family", name: "Family Contact", email: "family-contact@example.com", enabled: true, createdAt: 0,
+    });
+    const privacySettingsId = await ctx.db.insert("privacySettings", {
+      patientId, retentionDays: 30, updatedAt: 0, updatedBy: "user_patient",
+    });
+    const pushSubscriptionId = await ctx.db.insert("webNotificationSubscriptions", {
+      patientId, subject: "user_family", endpoint: "https://fcm.googleapis.com/fcm/send/family-device",
+      p256dh: "A".repeat(87), auth: "B".repeat(22), createdAt: 0, updatedAt: 0,
+    });
+    const proposalId = await ctx.db.insert("careProposals", {
+      patientId, conversationId, sourceChunkId: chunkId, kind: "appointment", priority: "routine", status: "needs_review",
+      title: "Suggested appointment", summary: "AI suggestion (unverified).", proposedAt: null, scheduledAt: null,
+      createdAt: 0, turnIds: [turnId], sourceText: "Let's have lunch.", sourceKey: "account-test-proposal",
+    });
+    const alertId = await ctx.db.insert("careAlerts", {
+      patientId, conversationId, kind: "appointment_reminder", priority: "routine", title: "Appointment reminder",
+      body: "Review the care dashboard.", createdAt: 0, emailStatus: "skipped", pushStatus: "skipped", acknowledged: false,
+      turnIds: [turnId], sourceKey: "account-test-alert",
+    });
+    return { storageId, sessionId, chunkId, jobId, conversationId, turnId, memoryId, contactId, familyContactId, privacySettingsId, pushSubscriptionId, proposalId, alertId, personId: person!._id };
   });
   return { t, owner, family, patientId, evidence };
 }
@@ -60,16 +83,32 @@ describe("account data deletion", () => {
       profiles: await ctx.db.query("familyProfiles").withIndex("by_subject", (q) => q.eq("subject", "user_family")).take(10),
       codes: await ctx.db.query("familyCodes").withIndex("by_subject", (q) => q.eq("subject", "user_family")).take(10),
       memberships: await ctx.db.query("memberships").withIndex("by_subject", (q) => q.eq("subject", "user_family")).take(10),
+      contacts: await ctx.db.query("emergencyContacts").withIndex("by_createdBy", (q) => q.eq("createdBy", "user_family")).take(10),
+      pushSubscriptions: await ctx.db.query("webNotificationSubscriptions").withIndex("by_subject", (q) => q.eq("subject", "user_family")).take(10),
       person: await ctx.db.get(evidence.personId),
     }));
-    expect(remaining).toEqual({ profiles: [], codes: [], memberships: [], person: null });
+    expect(remaining).toEqual({ profiles: [], codes: [], memberships: [], contacts: [], pushSubscriptions: [], person: null });
   });
 
   test("family deletion preserves the patient's evidence and anonymizes tagged speaker references", async () => {
     const { t, family, patientId, evidence } = await setup();
     await family.mutation(app.api.accounts.deleteMyData, { confirmation: "DELETE" });
-    const remaining = await t.run(async (ctx) => ({ patient: await ctx.db.get(patientId), conversation: await ctx.db.get(evidence.conversationId), turn: await ctx.db.get(evidence.turnId), memory: await ctx.db.get(evidence.memoryId) }));
-    expect(remaining).toMatchObject({ patient: { name: "Margaret" }, conversation: { people: [] }, turn: { speaker: "Unknown speaker", text: "Let's have lunch.", uncertain: true }, memory: { people: [] } });
+    const remaining = await t.run(async (ctx) => ({
+      patient: await ctx.db.get(patientId), conversation: await ctx.db.get(evidence.conversationId),
+      turn: await ctx.db.get(evidence.turnId), memory: await ctx.db.get(evidence.memoryId),
+      contact: await ctx.db.get(evidence.contactId), proposal: await ctx.db.get(evidence.proposalId), alert: await ctx.db.get(evidence.alertId),
+      privacySettings: await ctx.db.get(evidence.privacySettingsId),
+      familyContact: await ctx.db.get(evidence.familyContactId),
+      pushSubscription: await ctx.db.get(evidence.pushSubscriptionId),
+    }));
+    expect(remaining).toMatchObject({
+      patient: { name: "Margaret" }, conversation: { people: [] },
+      turn: { speaker: "Unknown speaker", text: "Let's have lunch.", uncertain: true }, memory: { people: [] },
+      contact: { email: "contact@example.com" }, proposal: { sourceText: "Let's have lunch." }, alert: { title: "Appointment reminder" },
+      privacySettings: { retentionDays: 30 },
+      familyContact: null,
+      pushSubscription: null,
+    });
     expect(remaining.turn?.personId).toBeUndefined();
     expect(await t.run(async (ctx) => (await ctx.storage.get(evidence.storageId)) !== null)).toBe(true);
   });
@@ -78,10 +117,10 @@ describe("account data deletion", () => {
     const { t, owner, patientId, evidence } = await setup();
     await owner.mutation(app.api.accounts.deleteMyData, { confirmation: "DELETE" });
     const remaining = await t.run(async (ctx) => {
-      const ids = [patientId, evidence.sessionId, evidence.chunkId, evidence.jobId, evidence.conversationId, evidence.turnId, evidence.memoryId, evidence.personId];
+      const ids = [patientId, evidence.sessionId, evidence.chunkId, evidence.jobId, evidence.conversationId, evidence.turnId, evidence.memoryId, evidence.personId, evidence.contactId, evidence.familyContactId, evidence.privacySettingsId, evidence.pushSubscriptionId, evidence.proposalId, evidence.alertId];
       return Promise.all(ids.map((id) => ctx.db.get(id)));
     });
-    expect(remaining).toEqual(Array(8).fill(null));
+    expect(remaining).toEqual(Array(14).fill(null));
     expect(await t.run((ctx) => ctx.storage.get(evidence.storageId))).toBeNull();
   });
 

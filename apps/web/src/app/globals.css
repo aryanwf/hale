@@ -147,10 +147,17 @@ svg { flex-shrink: 0; vertical-align: middle; }
 .conversation-table-head, .conversation-row { display: grid; grid-template-columns: 132px minmax(0, 1fr) 95px 114px 18px; gap: 20px; align-items: center; }
 .conversation-table-head { border-bottom: 1px solid var(--ink); padding-bottom: 12px; font-size: 10px; }
 .conversation-row { padding: 21px 0; border-bottom: 1px solid var(--rule); }
+.conversation-session { overflow: hidden; border: 1px solid var(--rule); border-radius: 8px; background: #fff; }
+.conversation-session-heading { display: flex; min-height: 36px; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; background: var(--ground); color: var(--muted); font-family: var(--font-mono); font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
+.conversation-session-heading > span:last-child { color: var(--accent); }
+.conversation-session-clips .conversation-row { padding-inline: 14px; }
+.conversation-session-clips .conversation-row:last-child { border-bottom: 0; }
+.conversation-session-clips .conversation-row:hover { background: #FFFDFC; }
 .conversation-row:hover .conversation-description h3 { color: var(--accent); }
 .conversation-when { display: grid; gap: 4px; }
 .conversation-when > span:first-child { font-size: 13px; font-weight: 500; }
 .conversation-when .mono { color: var(--muted); font-size: 10px; }
+.conversation-clip-label { color: var(--accent); font-family: var(--font-mono); font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
 .conversation-description h3 { font-size: 13px; font-weight: 500; letter-spacing: -.01em; }
 .conversation-description p { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.7; max-width: 65ch; }
 .people-stack { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; }

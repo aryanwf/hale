@@ -16,7 +16,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import type { Conversation, Person } from "@hale/contracts";
+import { groupConversationsBySession, type Conversation, type Person } from "@hale/contracts";
 import { clockLabel, dateLabel, localDate } from "@hale/contracts/time";
 import { useWorkspace } from "./providers";
 import { api } from "@/lib/api";
@@ -196,13 +196,23 @@ function ConversationResults({
 
     {conversations.length ? (
       <div className={styles.conversationList}>
-        {conversations.map((conversation) => <ConversationCard
-          key={conversation.id}
-          conversation={conversation}
-          people={people}
-          timezone={timezone}
-          today={today}
-        />)}
+        {groupConversationsBySession(conversations).map((group) => {
+          const isMultiClipSession = Boolean(group.recordingSessionId && group.conversations.length > 1);
+          const cards = group.conversations.map((conversation, index) => <ConversationCard
+            key={conversation.id}
+            conversation={conversation}
+            people={people}
+            timezone={timezone}
+            today={today}
+            clipNumber={isMultiClipSession ? (conversation.sequence ?? index) + 1 : undefined}
+          />);
+          if (!isMultiClipSession) return cards[0];
+          const countLabel = `${group.conversations.length} ${group.conversations.length === 1 ? "clip" : "clips"} shown`;
+          return <section className={styles.sessionGroup} key={group.key} aria-label={`Recording session, ${countLabel}`}>
+            <div className={styles.sessionHeading}><span>Recording session</span><span>{countLabel}</span></div>
+            <div className={styles.sessionClips}>{cards}</div>
+          </section>;
+        })}
       </div>
     ) : (
       <div className={styles.emptyState}>
@@ -226,11 +236,13 @@ function ConversationCard({
   people,
   timezone,
   today,
+  clipNumber,
 }: {
   conversation: Conversation;
   people: Person[];
   timezone: string;
   today: string;
+  clipNumber?: number;
 }) {
   const day = localDate(conversation.startedAt, timezone);
   const participants = people.filter((person) => conversation.people.includes(person.id));
@@ -253,6 +265,7 @@ function ConversationCard({
       <span className={styles.cardDivider} aria-hidden="true" />
 
       <div className={styles.conversationCopy}>
+        {clipNumber !== undefined && <span className={styles.clipLabel}>Clip {clipNumber}</span>}
         <h3>{conversation.title}</h3>
         <p>{conversation.summary}</p>
         <div className={styles.participants}>

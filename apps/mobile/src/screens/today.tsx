@@ -5,7 +5,7 @@ import { useWorkspace } from "../providers/workspace";
 import { colors, styles } from "../theme";
 import { Empty } from "../components/ui";
 import { RecordingCard } from "../components/recording-card";
-import { ConversationCard, MemoryCard, type OpenConversation } from "../components/evidence";
+import { ConversationGroupList, MemoryCard, type OpenConversation } from "../components/evidence";
 import { LegacyRecordings } from "../components/legacy-recordings";
 
 export function TodayScreen({ open, ask, care, memories }: { open: OpenConversation; ask(): void; care(): void; memories(): void }) {
@@ -31,7 +31,7 @@ export function TodayScreen({ open, ask, care, memories }: { open: OpenConversat
     <View style={styles.section}>
       <Text style={styles.heading}>Today’s conversations</Text>
       <View style={{ borderTopWidth: 1, borderColor: colors.ink }}>
-        {conversations.length ? conversations.slice(0, 5).map((conversation) => <ConversationCard key={conversation.id} conversation={conversation} open={open} />) : <Empty title="No conversations yet" />}
+        {conversations.length ? <ConversationGroupList conversations={conversations} open={open} limit={5} /> : <Empty title="No conversations yet" />}
       </View>
     </View>
     <Pressable accessibilityRole="button" onPress={care} style={[styles.row, { borderTopWidth: 1, borderColor: colors.border, paddingVertical: 24, marginTop: 12 }]}>

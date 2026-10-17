@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, AudioLines, ChevronRight, Clock3, Leaf, ShieldCheck } from "lucide-react";
 import type { Conversation, Memory } from "@hale/contracts";
-import { memoryLabels } from "@hale/contracts";
+import { groupConversationsBySession, memoryLabels } from "@hale/contracts";
 import { clockLabel, dateLabel, localDate } from "@hale/contracts/time";
 import { useWorkspace } from "./providers";
 import type { ReactNode } from "react";
@@ -30,15 +30,26 @@ export function PeopleStack({ ids, names = false }: { ids: string[]; names?: boo
 export function ConversationList({ conversations, base = "/family", compact = false }: { conversations: Conversation[]; base?: string; compact?: boolean }) {
   const { space, today } = useWorkspace();
   if (!conversations.length) return <EmptyState title="No conversations yet" description="There are no recordings available here yet." />;
+  const groups = groupConversationsBySession(conversations);
   return <div className={`conversation-list ${compact ? "conversation-list-compact" : ""}`}>
     {!compact && <div className="conversation-table-head eyebrow"><span>WHEN</span><span>CONVERSATION</span><span>PEOPLE</span><span>STATUS</span><span /></div>}
-    {conversations.map((conversation) => {
-      const day = localDate(conversation.startedAt, space.timezone);
-      return <Link className="conversation-row" href={`${base}/conversations/${conversation.id}`} key={conversation.id}>
-        <div className="conversation-when"><span>{day === today ? "Today" : dateLabel(day, { weekday: "short", month: "short", day: "numeric" })}</span><span className="mono">{clockLabel(conversation.startedAt, space.timezone)} · {Math.max(1, Math.round(conversation.duration / 60))} min</span></div>
-        <div className="conversation-description"><h3>{conversation.title}</h3><p>{conversation.summary}</p></div>
-        <PeopleStack ids={conversation.people} /><StatusPill state={conversation.state} /><ChevronRight className="row-chevron" size={18} />
-      </Link>;
+    {groups.map((group) => {
+      const isMultiClipSession = Boolean(group.recordingSessionId && group.conversations.length > 1);
+      const rows = group.conversations.map((conversation, index) => {
+        const day = localDate(conversation.startedAt, space.timezone);
+        const clipNumber = conversation.sequence === undefined ? index + 1 : conversation.sequence + 1;
+        return <Link className="conversation-row" href={`${base}/conversations/${conversation.id}`} key={conversation.id}>
+          <div className="conversation-when"><span>{day === today ? "Today" : dateLabel(day, { weekday: "short", month: "short", day: "numeric" })}</span><span className="mono">{clockLabel(conversation.startedAt, space.timezone)} · {Math.max(1, Math.round(conversation.duration / 60))} min</span></div>
+          <div className="conversation-description">{isMultiClipSession && <span className="conversation-clip-label">Clip {clipNumber}</span>}<h3>{conversation.title}</h3><p>{conversation.summary}</p></div>
+          <PeopleStack ids={conversation.people} /><StatusPill state={conversation.state} /><ChevronRight className="row-chevron" size={18} />
+        </Link>;
+      });
+      if (!isMultiClipSession) return rows[0];
+      const countLabel = `${group.conversations.length} ${group.conversations.length === 1 ? "clip" : "clips"} shown`;
+      return <div className="conversation-session" key={group.key} role="group" aria-label={`Recording session, ${countLabel}`}>
+        <div className="conversation-session-heading"><span>Recording session</span><span>{countLabel}</span></div>
+        <div className="conversation-session-clips">{rows}</div>
+      </div>;
     })}
   </div>;
 }

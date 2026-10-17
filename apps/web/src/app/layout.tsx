@@ -19,7 +19,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "hale. — your memories, always within reach.", template: "%s · hale." },
+  title: { default: "hale.", template: "%s · hale." },
   description: "A private, evidence-backed memory aid. Remember the conversations and little moments that matter.",
   robots: { index: false, follow: false },
 };

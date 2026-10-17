@@ -34,13 +34,13 @@ export function AskScreen({ day, open, care }: { day?: string; open: OpenConvers
     setExchanges((current) => [...current.slice(-19), { id: Date.now(), question: text, day: resolveDayQuestion(text, today, day) }]);
     setQuestion("");
   }
-  return <Page eyebrow="A LITTLE HELP REMEMBERING" title="Let’s find\nthat memory." description="Ask in your own words. We’ll start with what’s been recorded.">
-    <Text style={styles.eyebrow}>{day ? `LOOKING AT ${dateLabel(day)}` : "ALL AVAILABLE MEMORIES"}</Text>
-    {!exchanges.length && <View style={[styles.card, styles.cream]}><Text style={styles.heading}>A familiar moment is\na question away.</Text>{["What did I do today?", "What did Grace say about Sunday?", "Who did I speak with yesterday?", "Where did I leave my keys?"].map((value) => <Button key={value} title={value} tone="secondary" onPress={() => ask(value)} />)}</View>}
-    {exchanges.map((exchange) => <View key={exchange.id} style={styles.stack}><View style={[styles.card, styles.blush]}><Text style={styles.eyebrow}>YOU ASKED</Text><Text style={styles.body}>{exchange.question}</Text></View><View style={styles.card}><Text style={styles.eyebrow}>HALE · SOURCE-BOUND RECALL</Text>{exchange.day && <Text style={styles.small}>{dateLabel(exchange.day)}</Text>}{mode === "live" ? <LiveAnswer exchange={exchange} open={open} /> : <DemoAnswer exchange={exchange} open={open} />}</View></View>)}
-    <Field label="Your question" placeholder="What would you like to remember?" value={question} onChangeText={setQuestion} maxLength={1000} multiline />
+  return <Page eyebrow="SEARCH YOUR RECORDED WORDS" title="Ask Hale" description="Ask a question to find matching words in available recordings.">
+    <Text style={styles.eyebrow}>{day ? `DATE: ${dateLabel(day)}` : "ALL AVAILABLE DATES"}</Text>
+    {!exchanges.length && <View style={[styles.card, styles.cream]}><Text style={styles.heading}>What would you like to find?</Text>{["What was recorded today?", "What was said about Sunday?", "Who spoke in a recording?"].map((value) => <Button key={value} title={value} tone="secondary" onPress={() => ask(value)} />)}</View>}
+    {exchanges.map((exchange) => <View key={exchange.id} style={styles.stack}><View style={[styles.card, styles.blush]}><Text style={styles.eyebrow}>YOU ASKED</Text><Text style={styles.body}>{exchange.question}</Text></View><View style={styles.card}><Text style={styles.eyebrow}>HALE · FROM YOUR RECORDINGS</Text>{exchange.day && <Text style={styles.small}>{dateLabel(exchange.day)}</Text>}{mode === "live" ? <LiveAnswer exchange={exchange} open={open} /> : <DemoAnswer exchange={exchange} open={open} />}</View></View>)}
+    <Field label="Your question" placeholder="Type a question" value={question} onChangeText={setQuestion} maxLength={1000} multiline />
     <Button title="Ask Hale →" disabled={!question.trim()} onPress={() => ask(question)} />
-    <Notice>Source-bound text recall, not AI-generated advice or semantic search. The latest 20 questions stay on this screen only and are not saved as memories. When evidence is missing, we’ll say so.</Notice>
-    <Button title="Rides, appointments & medication records" tone="secondary" onPress={care} />
+    <Notice>Answers link to recorded words and may be incomplete. Questions are not saved as memories. Hale does not give medical advice.</Notice>
+    <Button title="Care and everyday tasks" tone="secondary" onPress={care} />
   </Page>;
 }

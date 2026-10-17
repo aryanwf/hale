@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { matchTranscriptTurns } from "./speaker-matching";
+import { matchTranscriptTurns } from "./speakerMatching";
 
 const turns = [{ id: "turn-1", start: 0, end: 4 }];
 const candidates = [{ label: "p_grace", personId: "grace" }];

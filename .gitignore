@@ -1,0 +1,29 @@
+# Local upstream checkout for inspection; do not commit its source, secrets, or media.
+/reference/
+.agents/skills/
+
+# Workspace dependencies and build output
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# Project-local OpenCode configuration
+/opencode.json
+
+.env*
+!.env.example
+!.env.*.example
+.DS_Store
+__pycache__/
+.venv/
+.pytest_cache/
+test-results/
+playwright-report/
+.next-e2e/
+.expo/
+/apps/mobile/android/
+/apps/mobile/ios/
+/apps/mobile/dist/
+/apps/mobile/build/

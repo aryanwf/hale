@@ -1,0 +1,16 @@
+{
+  "name": "@hale/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./api": "./src/api.ts",
+    "./audio": "./src/audio.ts",
+    "./demo": "./src/demo.ts",
+    "./recall": "./src/recall.ts",
+    "./time": "./src/time.ts",
+    "./voice": "./src/voice.ts",
+    "./languages": "./src/languages.ts"
+  }
+}

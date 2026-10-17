@@ -2,18 +2,27 @@ import { ConvexError, type GenericId } from "convex/values";
 import type { Capability } from "@hale/contracts";
 import type { QueryCtx } from "./lib/functions";
 
+const DELETED_ACCOUNT_MESSAGE = "Your Hale account was deleted. Finish deleting your sign-in account or create a new account.";
+
 export async function hashIdentity(tokenIdentifier: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(tokenIdentifier));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export async function requireIdentity(ctx: Pick<QueryCtx, "auth" | "db">) {
+export async function getAccountStatus(ctx: Pick<QueryCtx, "auth" | "db">) {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new ConvexError("Please sign in.");
+  if (!identity) return { status: "signedOut" as const };
   const identityHash = await hashIdentity(identity.tokenIdentifier);
   const deleted = await ctx.db.query("deletedAccounts").withIndex("by_identityHash", (q) => q.eq("identityHash", identityHash)).unique();
-  if (deleted) throw new ConvexError("Your Hale account was deleted. Finish deleting your sign-in account or create a new account.");
-  return identity;
+  if (deleted) return { status: "deleted" as const };
+  return { status: "active" as const, identity };
+}
+
+export async function requireIdentity(ctx: Pick<QueryCtx, "auth" | "db">) {
+  const account = await getAccountStatus(ctx);
+  if (account.status === "signedOut") throw new ConvexError("Please sign in.");
+  if (account.status === "deleted") throw new ConvexError(DELETED_ACCOUNT_MESSAGE);
+  return account.identity;
 }
 
 export async function requireMember(ctx: QueryCtx, patientId: GenericId<"patients">, capability: Capability) {

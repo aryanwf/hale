@@ -1,10 +1,21 @@
 import { v, ConvexError } from "convex/values";
 import { PATIENT_CAPABILITIES } from "@hale/contracts";
 import { query, mutation, type QueryCtx } from "./lib/functions";
-import { requireIdentity } from "./authz";
+import { getAccountStatus, requireIdentity } from "./authz";
+
+const patientInfoValidator = v.object({
+  id: v.id("patients"),
+  name: v.string(),
+  timezone: v.string(),
+  capabilities: v.array(v.string()),
+});
+const patientListValidator = v.array(patientInfoValidator);
 
 async function listPatients(ctx: QueryCtx, role?: "patient" | "family") {
-  const identity = await requireIdentity(ctx);
+  const account = await getAccountStatus(ctx);
+  if (account.status === "signedOut") throw new ConvexError("Please sign in.");
+  if (account.status === "deleted") return [];
+  const { identity } = account;
   const memberships = await ctx.db.query("memberships").withIndex("by_subject", (q) => q.eq("subject", identity.subject)).take(100);
   return (await Promise.all(memberships.filter((item) => item.active && (!role || item.role === role)).map(async (membership) => {
     const patient = await ctx.db.get(membership.patientId);
@@ -14,17 +25,19 @@ async function listPatients(ctx: QueryCtx, role?: "patient" | "family") {
 
 export const list = query({
   args: {},
+  returns: patientListValidator,
   handler: (ctx) => listPatients(ctx),
 });
 
 export const listForRole = query({
   args: { role: v.union(v.literal("patient"), v.literal("family")) },
-  returns: v.array(v.object({ id: v.id("patients"), name: v.string(), timezone: v.string(), capabilities: v.array(v.string()) })),
+  returns: patientListValidator,
   handler: (ctx, { role }) => listPatients(ctx, role),
 });
 
 export const create = mutation({
   args: { name: v.string(), timezone: v.string(), recordingConsent: v.boolean() },
+  returns: v.id("patients"),
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
     const name = args.name.trim();

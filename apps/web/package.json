@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "production:check": "bun scripts/check-production.ts",
     "icons": "node scripts/generate-icons.mjs"
   },

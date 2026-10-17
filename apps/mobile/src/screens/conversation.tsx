@@ -15,7 +15,7 @@ class SourceBoundary extends Component<{ children: ReactNode; back(): void }, { 
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
   render() {
-    return this.state.failed ? <Page eyebrow="SOURCE UNAVAILABLE" title="This memory has changed."><Notice>The source was deleted, your access changed, or your connection needs attention. No replacement evidence has been invented.</Notice><Button title="Go back" onPress={this.props.back} /></Page> : this.props.children;
+    return this.state.failed ? <Page eyebrow="SOURCE UNAVAILABLE" title="Conversation unavailable."><Notice>Please try again later.</Notice><Button title="Go back" onPress={this.props.back} /></Page> : this.props.children;
   }
 }
 function AudioPlayback({ url, timestamp }: { url: string; timestamp: number }) {
@@ -26,7 +26,7 @@ function AudioPlayback({ url, timestamp }: { url: string; timestamp: number }) {
   useEffect(() => { if (capturing) player.pause(); }, [capturing, player]);
   return <View style={styles.stack}><Text style={styles.mono}>{durationLabel(status.currentTime)} / {durationLabel(status.duration)}</Text><Button title={status.playing ? "Pause audio" : timestamp > 0 ? `Play from ${durationLabel(timestamp)}` : "Play original audio"} disabled={capturing || !status.isLoaded} onPress={() => {
     if (status.playing) { player.pause(); return; }
-    void player.seekTo(timestamp).then(() => player.play()).catch(() => Alert.alert("Audio unavailable", "The audio may have expired. Reopen the conversation to refresh its link."));
+    void player.seekTo(timestamp).then(() => player.play()).catch(() => Alert.alert("Audio unavailable", "Try again later."));
   }} />{capturing && <Text style={styles.small}>Stop microphone capture before playing audio.</Text>}</View>;
 }
 function DetailBody({ detail, timestamp, back }: { detail: Detail; timestamp: number; back(): void }) {
@@ -36,9 +36,9 @@ function DetailBody({ detail, timestamp, back }: { detail: Detail; timestamp: nu
   const { phase, pending, uploading } = useCapture();
   const processingLabel = { queued: "Queued", processing: "Processing", ready: "Ready", failed: "Could not process" }[conversation.state];
   function confirmDelete() {
-    Alert.alert("Delete this conversation?", "Its audio, transcript, and linked memories will be removed. This cannot be undone. Any unsent local copy is separate; discard it in Today.", [{ text: "Keep it", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => {
+    Alert.alert("Delete this conversation?", "Audio, transcript, and memories will be deleted. This can’t be undone.", [{ text: "Keep it", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => {
       setBusy(true);
-      void workspace.removeConversation(conversation.id).then(back).catch(() => { setBusy(false); Alert.alert("Couldn’t delete", "Check your connection and permissions, then try again."); });
+      void workspace.removeConversation(conversation.id).then(back).catch(() => { setBusy(false); Alert.alert("Couldn’t delete", "Please try again."); });
     } }]);
   }
   return <Page eyebrow="THE ORIGINAL WORDS" title={conversation.title} description={conversation.summary}>
@@ -48,7 +48,6 @@ function DetailBody({ detail, timestamp, back }: { detail: Detail; timestamp: nu
     {turns.length ? turns.map((turn) => <View key={turn.id} style={[styles.card, timestamp >= turn.start && timestamp < turn.end && styles.cream]}><Text style={styles.eyebrow}>{durationLabel(turn.start)} · {turn.uncertain ? "Speaker uncertain" : turn.speaker}</Text><Text style={styles.body}>{turn.text}</Text></View>) : <Empty title={conversation.state === "queued" ? "Transcript queued" : conversation.state === "processing" ? "Transcript processing" : conversation.state === "failed" ? "Transcript unavailable" : "No transcript available"} description={conversation.state === "queued" ? "The audio is queued for processing. No transcript text or speaker names are invented." : conversation.state === "processing" ? "The audio is still processing. Check back when it is ready." : conversation.state === "failed" ? "Processing did not complete. No transcript is available." : "No transcript is available for this conversation."} />}
     <Notice>Recorded statements are not verified events. A plan does not establish that something happened, and a speaker label is not proof of someone’s presence.</Notice>
     {workspace.space.capabilities.includes("evidence:delete") && <Button title={busy ? "Deleting…" : "Delete conversation & linked memories"} disabled={busy || uploading || pending.length > 0 || ["recording", "starting", "saving"].includes(phase)} tone="secondary" onPress={confirmDelete} />}
-    {pending.length > 0 && <Text style={styles.small}>Upload or discard pending local audio before deleting evidence, so a queued copy cannot be retried after deletion.</Text>}
     <Button title="← Back" tone="secondary" onPress={back} />
   </Page>;
 }
@@ -62,7 +61,7 @@ function ConversationContents({ id, timestamp = 0, back }: { id: string; timesta
   const { mode, space } = useWorkspace();
   if (mode === "live") return <LiveConversation id={id} timestamp={timestamp} back={back} />;
   const conversation = space.conversations.find((item) => item.id === id);
-  if (!conversation) return <Page eyebrow="SOURCE UNAVAILABLE" title="This memory has changed."><Notice>The original conversation may have been deleted. Ask again to use the remaining evidence.</Notice><Button title="Go back" onPress={back} /></Page>;
+  if (!conversation) return <Page eyebrow="SOURCE UNAVAILABLE" title="Conversation unavailable."><Button title="Go back" onPress={back} /></Page>;
   return <DetailBody detail={{ patientId: space.id, conversation, turns: conversation.turns, memories: [], audioUrl: null }} timestamp={timestamp} back={back} />;
 }
 

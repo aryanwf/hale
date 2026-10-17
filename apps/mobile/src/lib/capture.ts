@@ -65,7 +65,7 @@ export class CaptureController {
       ...record, endedAt: record.capturedAt + Math.min(record.durationMs, MAX_NATIVE_RECORDING_SECONDS * 1000),
     });
     if (recovered.length) dependencies.store.save(this.records);
-    this.update(recovered.length ? { message: "A previous recording was interrupted. Review the saved audio before retrying. Recovery uses the last measured duration; the final seconds may be missing." } : {});
+    this.update(recovered.length ? { message: "Previous recording interrupted. Review it before uploading." } : {});
   }
 
   subscribe = (listener: () => void) => {
@@ -85,16 +85,16 @@ export class CaptureController {
   start = async (consented: boolean) => {
     if (this.disposed || this.busy || this.active || this.snapshot.uploading) return;
     if (!consented) { this.update({ message: "Everyone taking part must agree before recording." }); return; }
-    if (this.records.length >= MAX_PENDING_RECORDINGS) { this.update({ message: "Your local queue is full. Upload or discard a saved recording first." }); return; }
+    if (this.records.length >= MAX_PENDING_RECORDINGS) { this.update({ message: "Too many saved recordings. Upload or discard one first." }); return; }
     this.busy = true;
     this.update({ phase: "starting", message: "" });
     let sessionId: string | undefined;
     let uri: string | undefined;
     try {
       uri = await this.dependencies.device.prepare();
-      if (this.disposed) throw new Error("Hale closed before recording could start.");
+      if (this.disposed) throw new Error("Hale closed before recording started.");
       sessionId = await this.dependencies.backend.beginSession();
-      if (this.disposed) throw new Error("Hale closed before recording could start.");
+      if (this.disposed) throw new Error("Hale closed before recording started.");
       const capturedAt = Date.now();
       const { owner, patientId } = this.dependencies.backend;
       this.active = { id: sessionId, owner, patientId, sessionId, uri, capturedAt, durationMs: 0 };
@@ -123,13 +123,13 @@ export class CaptureController {
     const durationMs = Math.max(0, Math.min(status.durationMillis, MAX_NATIVE_RECORDING_SECONDS * 1000));
     this.active.durationMs = durationMs;
     try { this.persist(); }
-    catch { void this.interrupt("Storage is unavailable. Recording stopped to protect your audio."); return; }
+    catch { void this.interrupt("Storage unavailable. Recording stopped."); return; }
     this.update({ seconds: durationMs / 1000 });
   };
 
   stop = () => this.finish("idle");
   pause = () => this.finish("paused");
-  interrupt = (message = "Recording stopped or was interrupted. Nothing resumes without your tap.") => this.finish("interrupted", message);
+  interrupt = (message = "Recording interrupted.") => this.finish("interrupted", message);
 
   private async finish(phase: CapturePhase, message = "") {
     if (this.busy || !this.active) return;
@@ -147,9 +147,9 @@ export class CaptureController {
       // Each pause closes a file/session, so pause gaps never become source audio timestamps.
       recording.endedAt = recording.capturedAt + recording.durationMs;
       this.persist();
-      this.update({ phase, message: message || "Saved on this device. Upload when you’re ready. Transcription is not connected yet." });
+      this.update({ phase, message: message || "Recording saved." });
     } catch {
-      this.update({ phase: "interrupted", message: this.active ? "Couldn’t stop the microphone. Tap Stop to retry; don’t close Hale." : "The microphone is off, but the file could not be verified or saved completely. Review, retry upload, or discard it; don’t clear app data." });
+      this.update({ phase: "interrupted", message: this.active ? "Couldn’t stop recording. Tap Stop to retry." : "Recording may be incomplete. Review it before uploading." });
     } finally {
       if (!this.active) {
         await this.dependencies.device.disable().catch(() => {});
@@ -167,7 +167,7 @@ export class CaptureController {
         recording.durationMs = await this.dependencies.device.measureDuration(recording.uri);
         recording.endedAt = recording.capturedAt + recording.durationMs;
         this.persist();
-        if (!uploadableRecording(recording, this.dependencies.store.fileSize(recording.uri))) throw new Error("This file is empty, incomplete, or exceeds the one-hour/20 MB limit. It remains on this device; review or discard it.");
+        if (!uploadableRecording(recording, this.dependencies.store.fileSize(recording.uri))) throw new Error("This recording can’t be uploaded. Review or discard it.");
         await this.dependencies.backend.upload(recording);
         await this.dependencies.backend.endSession(recording.sessionId);
         // Commit removal before deleting bytes; a failed upload never destroys local evidence.
@@ -177,9 +177,9 @@ export class CaptureController {
         this.dependencies.store.removeFile(recording.uri);
         this.update({});
       }
-      this.update({ message: "Audio uploaded. It will appear as queued; no transcript has been generated yet." });
+      this.update({ message: "Upload complete." });
     } catch (error) {
-      this.update({ message: error instanceof Error ? error.message : "Upload failed. Your audio remains on this device." });
+      this.update({ message: error instanceof Error ? error.message : "Upload failed. Try again." });
     } finally { this.update({ uploading: false }); }
   };
 
@@ -192,9 +192,9 @@ export class CaptureController {
       this.dependencies.store.save(remaining);
       this.records = remaining;
       this.dependencies.store.removeFile(recording.uri);
-    } catch { this.update({ message: "Couldn’t discard this file. Check device storage and try again." }); return; }
+    } catch { this.update({ message: "Couldn’t discard recording. Try again." }); return; }
     void this.dependencies.backend.endSession(recording.sessionId).catch(() => {});
-    this.update({ message: "Local audio discarded. This does not delete audio already uploaded." });
+    this.update({ message: "Recording discarded." });
   };
 
   dispose = () => {

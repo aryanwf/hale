@@ -117,6 +117,33 @@ describe("account data deletion", () => {
     await expect(family.mutation(app.api.voices.saveProfile, { name: "Daniel", relationship: "Son" })).rejects.toThrow("account was deleted");
   });
 
+  test("active accounts report their status", async () => {
+    const { family } = await setup();
+    expect(await family.query(app.api.accounts.status, {})).toBe("active");
+  });
+
+  test("signed-out requests report their status", async () => {
+    const t = app.createTest();
+    expect(await t.query(app.api.accounts.status, {})).toBe("signedOut");
+  });
+
+  test("deleted accounts report their status", async () => {
+    const { family } = await setup();
+    await family.mutation(app.api.accounts.deleteMyAccount, { confirmation: "DELETE" });
+    expect(await family.query(app.api.accounts.status, {})).toBe("deleted");
+  });
+
+  test("deleted accounts can load the patient list without a runtime error", async () => {
+    const { family } = await setup();
+    await family.mutation(app.api.accounts.deleteMyAccount, { confirmation: "DELETE" });
+    expect(await family.query(app.api.patients.listForRole, { role: "family" })).toEqual([]);
+  });
+
+  test("signed-out requests cannot list patients", async () => {
+    const t = app.createTest();
+    await expect(t.query(app.api.patients.listForRole, { role: "family" })).rejects.toThrow("sign in");
+  });
+
   test("permanent deletion can be retried if Clerk verification was cancelled", async () => {
     const { family } = await setup();
     await family.mutation(app.api.accounts.deleteMyAccount, { confirmation: "DELETE" });

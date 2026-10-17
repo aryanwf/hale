@@ -6,7 +6,7 @@ import { styles } from "../theme";
 
 export type OpenConversation = (id: string, timestamp?: number) => void;
 export function MemoryCard({ memory, open }: { memory: Memory; open: OpenConversation }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={`${memory.title}. Open original conversation`} onPress={() => open(memory.conversationId)} style={styles.card}><Text style={styles.eyebrow}>{memoryLabels[memory.kind]}</Text><Text style={styles.heading}>{memory.title}</Text><Text style={styles.body}>{memory.text}</Text><Text style={styles.small}>Original conversation ↗</Text>{memory.kind === "plan" && <Text style={styles.small}>A plan is not confirmation that it happened.</Text>}</Pressable>;
+  return <Pressable accessibilityRole="button" accessibilityLabel={`${memory.title}. Open original conversation`} onPress={() => open(memory.conversationId)} style={styles.card}><Text style={styles.eyebrow}>{memoryLabels[memory.kind]}</Text><Text style={styles.heading}>{memory.title}</Text><Text style={styles.body}>{memory.text}</Text><Text style={styles.small}>Original conversation ↗</Text></Pressable>;
 }
 export function ConversationCard({ conversation, open }: { conversation: Conversation; open: OpenConversation }) {
   const { space } = useWorkspace();

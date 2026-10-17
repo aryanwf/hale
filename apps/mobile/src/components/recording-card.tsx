@@ -20,7 +20,7 @@ export function RecordingCard() {
   const [consent, setConsent] = useState(false);
   const recording = phase === "recording";
   const busy = phase === "starting" || phase === "saving" || uploading;
-  if (!space.capabilities.includes("recordings:create")) return <View style={styles.card}><Text style={styles.small}>This account does not have recording permission in this patient space.</Text></View>;
+  if (!space.capabilities.includes("recordings:create")) return <View style={styles.card}><Text style={styles.small}>Recording unavailable for this space.</Text></View>;
   return <View style={[styles.card, styles.blush]}>
     <View style={styles.between}><Text style={styles.eyebrow}>{recording ? "RECORDING" : "RECORD A CONVERSATION"}</Text><Text style={styles.mono}>{durationLabel(seconds)}</Text></View>
     <Text style={styles.heading}>{recording ? "Recording in progress" : phase === "paused" ? "Recording paused" : "Save a conversation"}</Text>
@@ -33,9 +33,8 @@ export function RecordingCard() {
     {mode === "demo" && <Text style={styles.small}>Demo audio stays on this device. It is never uploaded or transcribed.</Text>}
     {pending.length > 0 && <View style={styles.stack}>
       <View style={styles.divider} /><Text style={styles.eyebrow}>{pending.length} SAVED ON THIS DEVICE</Text>
-      {pending.map((item, index) => <View key={item.id} style={styles.stack}><Text style={styles.small}>Segment {index + 1} · {durationLabel(item.durationMs / 1000)}</Text>{!hasActiveRecording && <LocalPlayback uri={item.uri} />}<Button title={`Discard local segment ${index + 1}`} tone="secondary" disabled={hasActiveRecording || busy} onPress={() => Alert.alert("Discard this local audio?", "This cannot be undone. Previously uploaded evidence is not deleted here.", [{ text: "Keep it", style: "cancel" }, { text: "Discard", style: "destructive", onPress: () => controller.discard(item.id) }])} /></View>)}
+      {pending.map((item, index) => <View key={item.id} style={styles.stack}><Text style={styles.small}>Recording {index + 1} · {durationLabel(item.durationMs / 1000)}</Text>{!hasActiveRecording && <LocalPlayback uri={item.uri} />}<Button title={`Discard recording ${index + 1}`} tone="secondary" disabled={hasActiveRecording || busy} onPress={() => Alert.alert("Discard recording?", "This deletes the saved copy on this device.", [{ text: "Cancel", style: "cancel" }, { text: "Discard", style: "destructive", onPress: () => controller.discard(item.id) }])} /></View>)}
       {mode === "live" && <Button title={uploading ? "Uploading…" : "Upload saved audio / retry"} disabled={recording || busy} onPress={() => void controller.retry()} />}
-      <Text style={styles.small}>A maximum of 3 files are kept in the app’s private storage until uploaded or discarded. Android app backup is disabled. Uninstalling or clearing app data removes unsent audio.</Text>
     </View>}
   </View>;
 }

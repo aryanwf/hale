@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { Component, createContext, useContext, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ClerkProvider, UserButton, useAuth } from "@clerk/nextjs";
 import { ConvexReactClient, useConvexAuth, useMutation, useQuery } from "convex/react";
@@ -76,15 +76,25 @@ function LiveSpace({ patientId, patients, selectPatient, children }: { patientId
   }}>{children}</WorkspaceContext.Provider>;
 }
 
+function DeletedAccountGate() {
+  return <Gate title="Your Hale account was deleted." description="Your Hale data has already been removed. Finish deleting your sign-in account or create a new account.">
+    <div className="button-group"><Link href="/account/delete" className="btn btn-primary">Finish deleting sign-in account</Link><Link href="/signup" className="btn btn-quiet">Create a new account</Link><UserButton /></div>
+  </Gate>;
+}
+
 function LiveGate({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth();
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
-  const patients = useQuery(api.patients, isAuthenticated ? { role: "family" } : "skip");
+  const accountStatus = useQuery(api.accountStatus, isAuthenticated ? {} : "skip");
+  const patients = useQuery(api.patients, isAuthenticated && accountStatus === "active" ? { role: "family" } : "skip");
   const [selected, setSelected] = useState<string>();
   if (!isLoaded) return <Gate title="A moment for your memories…" />;
   if (!isSignedIn) return <Gate title="A little closer, even from afar." description="Sign in to see the memories your loved one shares with your family account."><div className="button-group"><Link href="/login" className="btn btn-primary">Log in <ArrowRight size={17} /></Link><Link href="/signup" className="btn btn-quiet">Create a family account</Link></div></Gate>;
   if (authLoading) return <Gate title="Connecting securely…" />;
   if (!isAuthenticated) return <Gate title="Your memory connection needs attention." description="Your account is signed in, but Convex could not authenticate it. Check the Clerk convex JWT template and deployment issuer configuration."><UserButton /></Gate>;
+  if (accountStatus === undefined) return <Gate title="Checking your account…" />;
+  if (accountStatus === "deleted") return <DeletedAccountGate />;
+  if (accountStatus !== "active") return <Gate title="Your memory connection needs attention." description="Please reconnect your sign-in account to continue."><UserButton /></Gate>;
   if (!patients) return <Gate title="Finding your memory space…" />;
   if (!patients.length) return <Onboarding />;
   const patientId = patients.find((patient) => patient.id === selected)?.id ?? patients[0].id;
@@ -99,6 +109,30 @@ function Onboarding() {
 
 export function Gate({ title, description, children }: { title: string; description?: string; children?: ReactNode }) {
   return <main className="gate"><Link className="wordmark" href="/"><Leaf size={23} />hale.</Link><p className="eyebrow">YOUR MEMORIES, ALWAYS WITHIN REACH.</p><h1>{title}</h1>{description && <p className="gate-description">{description}</p>}{children}</main>;
+}
+
+class WorkspaceErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+
+    return (
+      <Gate
+        title="Your Hale space couldn’t be opened."
+        description="Use the account menu to sign out, then tap Try again to sign in with an active account or create one. If you deleted your Hale data, finish deleting your sign-in account."
+      >
+        <UserButton />
+        <button className="btn btn-quiet" type="button" onClick={() => this.setState({ failed: false })}>
+          Try again
+        </button>
+      </Gate>
+    );
+  }
 }
 
 function configuredClient() {
@@ -117,5 +151,5 @@ export function AppProviders({ children }: { children: ReactNode }) {
 // Public auth/onboarding routes need identity/backend providers, not a patient workspace.
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   if (appMode !== "live") return children;
-  return <LiveGate>{children}</LiveGate>;
+  return <WorkspaceErrorBoundary><LiveGate>{children}</LiveGate></WorkspaceErrorBoundary>;
 }

@@ -6,7 +6,7 @@ const directory = new Directory(Paths.document, "hale-capture");
 function readManifest(file: File): LocalRecording[] {
   if (!file.exists) return [];
   const value: unknown = JSON.parse(file.textSync());
-  if (!Array.isArray(value) || !value.every(isLocalRecording)) throw new Error("Local recording index is unreadable. Do not clear app data; contact support to recover audio.");
+  if (!Array.isArray(value) || !value.every(isLocalRecording)) throw new Error("Saved recordings are unavailable. Contact support before clearing app data.");
   return value;
 }
 

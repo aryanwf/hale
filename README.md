@@ -26,6 +26,8 @@ QR codes are generated locally in the browser; no pairing secrets go to an exter
 
 Use `bun install` for this workspace. `bunfig.toml` isolates dependencies so the web and Android apps keep their respective React versions.
 
+Start development with `bun run dev` and validate with `bun run check`. Do not mix `npm install` or `npm ci` with Bun installs. If startup reports missing TypeScript types, an esbuild platform mismatch, or npm `ENOTEMPTY`, stop the dev processes, move the root and app `node_modules` directories aside, then run `bun install --frozen-lockfile`. A forced install alone may leave stale npm packages that shadow Bun’s isolated dependencies. After changing Next.js versions, also move `apps/web/.next` aside to regenerate cached route types.
+
 ### Delete an account
 
 In web **Settings → Delete account**, review the signed-in email and type `DELETE`. The Android **Your space → Delete account** button opens the same confirmation screen. It removes Hale profiles, voiceprints, retained samples, consent records, family codes, and memberships; patient-owned spaces and their evidence/audio are deleted too. Other patients’ original conversations remain, with account-linked speaker labels anonymized. The screen then deletes the Clerk account, with reverification if required. If Clerk deletion fails or is cancelled, the screen explains that Hale data is already gone and lets the user retry the sign-in-account deletion.

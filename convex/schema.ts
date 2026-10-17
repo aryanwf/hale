@@ -20,7 +20,8 @@ export default defineSchema({
   }).index("by_subject", ["subject"]).index("by_voice_state", ["voiceState", "updatedAt"]),
   patients: defineTable({
     name: v.string(), timezone: v.string(), createdBy: v.string(),
-    audioRetentionDays: v.number(), createdAt: v.number(),
+    audioRetentionDays: v.number(), // legacy field; new uploads use short processing TTLs instead
+    createdAt: v.number(),
   }).index("by_createdBy", ["createdBy"]),
   memberships: defineTable({
     patientId: v.id("patients"), subject: v.string(),
@@ -54,6 +55,7 @@ export default defineSchema({
     state: v.union(v.literal("recording"), v.literal("paused"), v.literal("interrupted"), v.literal("stopped")),
     consentConfirmedAt: v.number(),
     captureMode: v.optional(v.union(v.literal("native"), v.literal("web"))),
+    expectedPeople: v.optional(v.array(v.id("people"))),
   }).index("by_patient", ["patientId"]),
   audioChunks: defineTable({
     patientId: v.id("patients"), sessionId: v.id("recordingSessions"),
@@ -66,9 +68,18 @@ export default defineSchema({
   processingJobs: defineTable({
     patientId: v.id("patients"), chunkId: v.id("audioChunks"),
     state: v.union(v.literal("queued"), v.literal("processing"), v.literal("ready"), v.literal("failed")),
-    error: v.optional(v.string()), attempts: v.optional(v.number()), generation: v.optional(v.number()), updatedAt: v.optional(v.number()), createdAt: v.number(),
+    error: v.optional(v.string()), attempts: v.optional(v.number()), generation: v.optional(v.number()), providerJobId: v.optional(v.string()), updatedAt: v.optional(v.number()), createdAt: v.number(),
   }).index("by_chunk", ["chunkId"]).index("by_state", ["state"]).index("by_state_updated", ["state", "updatedAt"])
     .index("by_patientId", ["patientId"]),
+  speakerMatchingJobs: defineTable({
+    patientId: v.id("patients"), chunkId: v.id("audioChunks"), conversationId: v.id("conversations"),
+    expectedPeople: v.array(v.id("people")),
+    state: v.union(v.literal("queued"), v.literal("processing"), v.literal("ready"), v.literal("failed"), v.literal("skipped")),
+    error: v.optional(v.string()), attempts: v.number(), generation: v.number(),
+    providerJobId: v.optional(v.string()),
+    candidates: v.optional(v.array(v.object({ label: v.string(), personId: v.id("people"), profileId: v.id("familyProfiles"), enrollmentVersion: v.number() }))),
+    updatedAt: v.number(), createdAt: v.number(),
+  }).index("by_chunk", ["chunkId"]).index("by_state_updated", ["state", "updatedAt"]),
   conversations: defineTable({
     patientId: v.id("patients"), chunkId: v.id("audioChunks"),
     title: v.string(), summary: v.string(), startedAt: v.number(), duration: v.number(),

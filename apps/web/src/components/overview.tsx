@@ -129,7 +129,7 @@ export function Overview() {
 
       <section className="overview-section overview-feature" aria-labelledby="overview-conversations-title">
         <div className="overview-section-heading">
-          <div><h2 id="overview-conversations-title">Recent conversations</h2><p>Original recordings and processing status</p></div>
+          <div><h2 id="overview-conversations-title">Recent conversations</h2><p>Transcripts and processing status</p></div>
           <Link href="/family/conversations">View all<ArrowRight size={14} /></Link>
         </div>
         {recent.length ? <ul className="overview-conversation-list">

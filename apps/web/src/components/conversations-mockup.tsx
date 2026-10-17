@@ -2,6 +2,7 @@
 
 import { useDeferredValue, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import {
   ArrowRight,
@@ -25,7 +26,8 @@ import styles from "./conversations-mockup.module.css";
 
 export function ConversationsMockupView() {
   const { space, today, mode } = useWorkspace();
-  const [query, setQuery] = useState("");
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const [person, setPerson] = useState("");
   const [range, setRange] = useState("all");
   const searchTerm = query.trim().toLowerCase();
@@ -80,6 +82,7 @@ export function ConversationsMockupView() {
           <div className={styles.searchBox}>
             <Search size={18} aria-hidden="true" />
             <input
+              id="conversation-search"
               type="search"
               aria-label="Search conversations"
               placeholder="Search words, people, or moments…"
@@ -221,7 +224,7 @@ function ConversationResults({
         {hasFilters ? (
           <button type="button" onClick={onClear}>Clear search and filters</button>
         ) : (
-          <Link href="/patient/today" className={styles.emptyLink}>Go to patient view<ArrowRight size={15} /></Link>
+          <Link href="/patient/today" className={styles.emptyLink}>Open recording view<ArrowRight size={15} /></Link>
         )}
       </div>
     )}

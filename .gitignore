@@ -12,6 +12,9 @@ coverage/
 # Project-local OpenCode configuration
 /opencode.json
 
+# Personal project plan; keep local and out of commits
+/plan.md
+
 .env*
 !.env.example
 !.env.*.example

@@ -20,9 +20,9 @@ import { colors, styles } from "./src/theme";
 
 type Tab = "today" | "memories" | "ask" | "care" | "more";
 const tabs: { id: Tab; label: string; symbol: string }[] = [
-  { id: "today", label: "Today", symbol: "☼" }, { id: "memories", label: "Memories", symbol: "▦" },
-  { id: "ask", label: "Ask Hale", symbol: "✧" }, { id: "care", label: "Care", symbol: "+" },
-  { id: "more", label: "Your space", symbol: "○" },
+  { id: "today", label: "Today", symbol: "⌂" }, { id: "memories", label: "Memories", symbol: "▤" },
+  { id: "ask", label: "Ask", symbol: "?" }, { id: "care", label: "Care", symbol: "+" },
+  { id: "more", label: "More", symbol: "···" },
 ];
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -58,11 +58,11 @@ function Dashboard() {
   else if (tab === "care") screen = <CareScreen />;
   else screen = <MoreScreen />;
   return <View style={styles.screen}>
-    <View style={[styles.between, { paddingHorizontal: 24, paddingVertical: 12, borderBottomWidth: 1, borderColor: colors.border }]}><Text accessibilityLabel="Hale" style={styles.wordmark}>hale.</Text><View style={{ alignItems: "flex-end" }}><Text style={styles.small}>{space.name}</Text><Text style={styles.eyebrow}>{mode === "demo" ? "FICTIONAL DEMO" : "YOUR PRIVATE SPACE"}</Text></View></View>
-    {phase === "recording" && (tab !== "today" || detail) && <View style={[styles.row, { paddingHorizontal: 24, paddingVertical: 10, backgroundColor: colors.blush }]}><Text accessibilityLiveRegion="polite" style={[styles.small, styles.grow]}>◉ Recording · {Math.floor(seconds / 60)} min</Text><Button title="Recording controls" tone="secondary" onPress={() => { setTab("today"); setDetail(undefined); }} /></View>}
-    {detail && <View style={{ paddingHorizontal: 24, paddingTop: 8 }}><Button title="← Back to dashboard" tone="secondary" onPress={() => setDetail(undefined)} /></View>}
+    <View style={styles.appHeader}><Text accessibilityLabel="Hale" style={styles.wordmark}>hale.</Text><View style={styles.headerMeta}><Text numberOfLines={1} style={styles.headerName}>{space.name}</Text><Text style={styles.headerLabel}>{mode === "demo" ? "Demo · fictional records" : "Patient space"}</Text></View></View>
+    {phase === "recording" && (tab !== "today" || detail) && <View style={[styles.row, { paddingHorizontal: 20, paddingVertical: 9, backgroundColor: colors.blush }]}><Text accessibilityLiveRegion="polite" style={[styles.small, styles.grow]}>Recording · {Math.floor(seconds / 60)} min</Text><Button title="Open controls" tone="secondary" onPress={() => { setTab("today"); setDetail(undefined); }} /></View>}
+    {detail && <View style={{ paddingHorizontal: 20, paddingTop: 8 }}><Button title="Back to conversations" tone="secondary" onPress={() => setDetail(undefined)} /></View>}
     <View style={styles.grow}><View style={[styles.grow, detail && { display: "none" }]}>{screen}</View>{detail && <ConversationScreen key={detail.id} {...detail} back={() => setDetail(undefined)} />}</View>
-    <View accessibilityRole="tablist" style={styles.tabs}>{tabs.map((item) => <Pressable key={item.id} accessibilityRole="tab" accessibilityLabel={item.label} accessibilityState={{ selected: !detail && tab === item.id }} onPress={() => { setDetail(undefined); setTab(item.id); }} style={styles.tab}><Text style={[styles.tabIcon, tab === item.id && styles.tabActive]}>{item.symbol}</Text><Text style={[styles.tabText, tab === item.id && styles.tabActive]}>{item.label}</Text></Pressable>)}</View>
+    <View accessibilityRole="tablist" style={styles.tabs}>{tabs.map((item) => { const selected = !detail && tab === item.id; return <Pressable key={item.id} accessibilityRole="tab" accessibilityLabel={item.label} accessibilityState={{ selected }} onPress={() => { setDetail(undefined); setTab(item.id); }} style={[styles.tab, selected && styles.tabSelected]}><Text style={[styles.tabIcon, selected && styles.tabActive]}>{item.symbol}</Text><Text style={[styles.tabText, selected && styles.tabActive]}>{item.label}</Text></Pressable>; })}</View>
   </View>;
 }
 
@@ -72,5 +72,5 @@ function PatientApp() {
 }
 export default function App() {
   const [loaded, error] = useFonts({ Geist: Geist_400Regular, GeistMedium: Geist_500Medium, LibreBaskerville: LibreBaskerville_400Regular, IBMPlexMono: IBMPlexMono_400Regular });
-  return <SafeAreaProvider><SafeAreaView style={styles.screen}><StatusBar style="dark" />{error ? <Text style={{ padding: 32, color: colors.ink }}>The display fonts could not load. Restart Hale to try again.</Text> : !loaded ? <Loading /> : <ErrorBoundary><WorkspaceProvider><PatientApp /></WorkspaceProvider></ErrorBoundary>}</SafeAreaView></SafeAreaProvider>;
+  return <SafeAreaProvider><SafeAreaView style={styles.screen}><StatusBar style="dark" />{error ? <Text style={{ padding: 32, color: colors.ink }}>Hale could not load its fonts. Restart the app to try again.</Text> : !loaded ? <Loading /> : <ErrorBoundary><WorkspaceProvider><PatientApp /></WorkspaceProvider></ErrorBoundary>}</SafeAreaView></SafeAreaProvider>;
 }

@@ -1,0 +1,280 @@
+import { makeFunctionReference } from "convex/server";
+import { ConvexError, v, type GenericId } from "convex/values";
+import { SARVAM_REALTIME_STT_MAX_SECONDS, transcribeAudio, SarvamApiError } from "./lib/sarvam";
+import { requireMember } from "./authz";
+import { internalAction, internalMutation, mutation } from "./lib/functions";
+
+const transcribeRef = makeFunctionReference<"action">("transcriptions:transcribe");
+const claimRef = makeFunctionReference<"mutation">("transcriptions:claim");
+const completeRef = makeFunctionReference<"mutation">("transcriptions:complete");
+const failRef = makeFunctionReference<"mutation">("transcriptions:fail");
+
+const MAX_PROVIDER_SEGMENTS = 5_000;
+const MAX_TURNS = 500;
+const MAX_TRANSCRIPT_CHARACTERS = 100_000;
+const MAX_ATTEMPTS = 3;
+
+type TranscriptTurnInput = { start: number; end: number; text: string };
+
+/** Keep every transcript anonymous until a verified diarization/matching provider is connected. */
+export function makeUnknownTurns(
+  transcript: string,
+  timestamps: { segments: string[]; startTimeSeconds: number[]; endTimeSeconds: number[] } | undefined,
+  durationSeconds: number,
+): TranscriptTurnInput[] {
+  const wholeText = transcript.trim();
+  if (wholeText.length > MAX_TRANSCRIPT_CHARACTERS) throw new Error("Sarvam transcript exceeded the supported size.");
+  if (!wholeText) return [];
+
+  const validTimestamps = timestamps
+    && timestamps.segments.length === timestamps.startTimeSeconds.length
+    && timestamps.segments.length === timestamps.endTimeSeconds.length
+    && timestamps.segments.length <= MAX_PROVIDER_SEGMENTS;
+  if (!validTimestamps) return [{ start: 0, end: durationSeconds, text: wholeText }];
+  const hasInvalidTimestamp = timestamps.segments.some((word, index) =>
+    !word.trim() || !Number.isFinite(timestamps.startTimeSeconds[index]) || !Number.isFinite(timestamps.endTimeSeconds[index]) ||
+    timestamps.endTimeSeconds[index] <= timestamps.startTimeSeconds[index] || timestamps.startTimeSeconds[index] < 0 ||
+    timestamps.endTimeSeconds[index] > durationSeconds,
+  );
+  if (hasInvalidTimestamp) return [{ start: 0, end: durationSeconds, text: wholeText }];
+
+  const turns: TranscriptTurnInput[] = [];
+  let current: TranscriptTurnInput | undefined;
+  for (let index = 0; index < timestamps.segments.length; index++) {
+    const word = timestamps.segments[index]?.trim();
+    const rawStart = timestamps.startTimeSeconds[index];
+    const rawEnd = timestamps.endTimeSeconds[index];
+    if (!word || !Number.isFinite(rawStart) || !Number.isFinite(rawEnd) || rawEnd <= rawStart) continue;
+    const start = Math.max(0, Math.min(durationSeconds, rawStart));
+    const end = Math.max(start, Math.min(durationSeconds, rawEnd));
+    if (end <= start) continue;
+
+    const gap = current ? start - current.end : 0;
+    const sentenceEnded = current && /[.!?।॥]$/.test(current.text);
+    if (current && (gap > 1.25 || sentenceEnded)) {
+      turns.push(current);
+      current = undefined;
+    }
+
+    if (!current) current = { start, end, text: word };
+    else {
+      const punctuation = /^[,.;:!?।॥…%)\]}]/u.test(word);
+      current.text = `${current.text}${punctuation ? "" : " "}${word}`.slice(0, MAX_TRANSCRIPT_CHARACTERS);
+      current.end = end;
+    }
+  }
+  if (current) turns.push(current);
+
+  // Timestamp payloads are optional and occasionally incomplete. Preserve the complete text rather than dropping it.
+  if (!turns.length) return [{ start: 0, end: durationSeconds, text: wholeText }];
+  if (turns.length > MAX_TURNS || turns.reduce((total, turn) => total + turn.text.length, 0) > MAX_TRANSCRIPT_CHARACTERS) {
+    return [{ start: 0, end: durationSeconds, text: wholeText }];
+  }
+  return turns;
+}
+
+export const claim = internalMutation({
+  args: { jobId: v.id("processingJobs") },
+  handler: async (ctx, { jobId }) => {
+    const job = await ctx.db.get(jobId);
+    if (!job || job.state !== "queued") return null;
+    const chunk = await ctx.db.get(job.chunkId);
+    const conversation = await ctx.db.query("conversations").withIndex("by_chunk", (q) => q.eq("chunkId", job.chunkId)).unique();
+    if (!chunk || chunk.patientId !== job.patientId || chunk.deletedAt || !conversation || conversation.patientId !== job.patientId || conversation.deletedAt) {
+      await ctx.db.patch(jobId, { state: "failed", error: "Source deleted or unavailable.", updatedAt: Date.now() });
+      return null;
+    }
+    if (!chunk.storageId || chunk.expiresAt <= Date.now()) {
+      await ctx.db.patch(jobId, { state: "failed", error: "Audio is no longer available.", updatedAt: Date.now() });
+      await ctx.db.patch(chunk._id, { state: "failed" });
+      await ctx.db.patch(conversation._id, { state: "failed", summary: "Transcription could not start because the retained audio is no longer available." });
+      return null;
+    }
+
+    const now = Date.now();
+    const generation = (job.generation ?? 0) + 1;
+    await ctx.db.patch(jobId, { state: "processing", attempts: (job.attempts ?? 0) + 1, generation, updatedAt: now, error: undefined });
+    await ctx.db.patch(chunk._id, { state: "processing" });
+    await ctx.db.patch(conversation._id, { state: "processing", summary: "Sarvam AI is preparing a timestamped transcript. Speakers remain unnamed." });
+    return {
+      storageId: chunk.storageId,
+      durationSeconds: (chunk.endedAt - chunk.capturedAt) / 1000,
+      mimeType: chunk.mimeType,
+      generation,
+    };
+  },
+});
+
+export const complete = internalMutation({
+  args: {
+    jobId: v.id("processingJobs"),
+    generation: v.number(),
+    turns: v.array(v.object({ start: v.number(), end: v.number(), text: v.string() })),
+    languageCode: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const job = await ctx.db.get(args.jobId);
+    if (!job || job.state !== "processing" || job.generation !== args.generation) return false;
+    const chunk = await ctx.db.get(job.chunkId);
+    const conversation = await ctx.db.query("conversations").withIndex("by_chunk", (q) => q.eq("chunkId", job.chunkId)).unique();
+    if (!chunk || chunk.patientId !== job.patientId || chunk.deletedAt || !conversation || conversation.patientId !== job.patientId || conversation.deletedAt) return false;
+    if (!args.turns.length || args.turns.length > MAX_TURNS || args.turns.some((turn) =>
+      !Number.isFinite(turn.start) || !Number.isFinite(turn.end) || turn.start < 0 || turn.end <= turn.start || turn.end > conversation.duration + 1 ||
+      !turn.text.trim() || turn.text.length > MAX_TRANSCRIPT_CHARACTERS,
+    )) throw new ConvexError("The transcription result was invalid.");
+
+    const now = Date.now();
+    for (const turn of args.turns) {
+      await ctx.db.insert("transcriptTurns", {
+        patientId: job.patientId,
+        conversationId: conversation._id,
+        speaker: "Unknown speaker",
+        start: turn.start,
+        end: turn.end,
+        text: turn.text,
+        uncertain: true,
+      });
+    }
+    await ctx.db.patch(job._id, { state: "ready", error: undefined, updatedAt: now });
+    await ctx.db.patch(chunk._id, { state: "ready" });
+    await ctx.db.patch(conversation._id, {
+      state: "ready",
+      title: "Recorded conversation",
+      summary: `Transcript prepared with Sarvam AI${args.languageCode ? ` (${args.languageCode})` : ""}. Speaker identities are not available, so every voice stays unknown.`,
+    });
+    return true;
+  },
+});
+
+export const fail = internalMutation({
+  args: { jobId: v.id("processingJobs"), generation: v.number(), retryable: v.boolean(), unsupportedDuration: v.optional(v.boolean()) },
+  handler: async (ctx, { jobId, generation, retryable, unsupportedDuration }) => {
+    const job = await ctx.db.get(jobId);
+    if (!job || job.state !== "processing" || job.generation !== generation) return null;
+    const chunk = await ctx.db.get(job.chunkId);
+    const conversation = await ctx.db.query("conversations").withIndex("by_chunk", (q) => q.eq("chunkId", job.chunkId)).unique();
+    if (!chunk || chunk.deletedAt || !conversation || conversation.deletedAt) {
+      await ctx.db.patch(jobId, { state: "failed", error: "Source deleted or unavailable.", updatedAt: Date.now() });
+      return null;
+    }
+
+    const now = Date.now();
+    const willRetry = retryable && (job.attempts ?? 1) < MAX_ATTEMPTS && chunk.storageId && chunk.expiresAt > now;
+    if (willRetry) {
+      await ctx.db.patch(jobId, { state: "queued", error: "Temporary Sarvam transcription error; retry scheduled.", updatedAt: now });
+      await ctx.db.patch(chunk._id, { state: "queued" });
+      await ctx.db.patch(conversation._id, { state: "queued", summary: "A temporary transcription problem occurred. Hale will retry automatically." });
+      const delayMs = Math.min(2_000 * 2 ** Math.max(0, (job.attempts ?? 1) - 1), 15_000);
+      await ctx.scheduler.runAfter(delayMs, transcribeRef, { jobId });
+      return null;
+    }
+
+    const error = unsupportedDuration ? "Clip exceeds Saaras realtime duration limit." : "Sarvam transcription could not be completed.";
+    await ctx.db.patch(jobId, { state: "failed", error, updatedAt: now });
+    await ctx.db.patch(chunk._id, { state: "failed" });
+    await ctx.db.patch(conversation._id, {
+      state: "failed",
+      summary: unsupportedDuration
+        ? `Sarvam Saaras realtime transcription accepts clips up to ${SARVAM_REALTIME_STT_MAX_SECONDS} seconds. This older clip is longer; new recorder segments are limited to 25 seconds. No speaker identity was inferred.`
+        : "A transcript could not be prepared. No speaker identity was inferred. You can retry while the original audio is still available.",
+    });
+    return null;
+  },
+});
+
+export const transcribe = internalAction({
+  args: { jobId: v.id("processingJobs") },
+  handler: async (ctx, { jobId }) => {
+    const claimed: {
+      storageId: GenericId<"_storage">;
+      durationSeconds: number;
+      mimeType: string;
+      generation: number;
+    } | null = await ctx.runMutation(claimRef, { jobId });
+    if (!claimed) return null;
+
+    try {
+      const audio = await ctx.storage.get(claimed.storageId);
+      if (!audio) throw new Error("The source audio is unavailable.");
+      const result = await transcribeAudio(audio, {
+        durationSeconds: claimed.durationSeconds,
+        filename: recordingFilename(claimed.mimeType),
+        withTimestamps: true,
+      });
+      const turns = makeUnknownTurns(result.transcript, result.timestamps, claimed.durationSeconds);
+      if (!turns.length) throw new Error("Sarvam returned no transcript.");
+      await ctx.runMutation(completeRef, { jobId, generation: claimed.generation, turns, languageCode: result.languageCode ?? undefined });
+    } catch (error) {
+      const retryable = isRetryableSarvamError(error);
+      const unsupportedDuration = error instanceof Error && error.message.includes(`accepts clips up to ${SARVAM_REALTIME_STT_MAX_SECONDS} seconds`);
+      await ctx.runMutation(failRef, { jobId, generation: claimed.generation, retryable, unsupportedDuration });
+    }
+    return null;
+  },
+});
+
+export const retry = mutation({
+  args: { conversationId: v.id("conversations") },
+  handler: async (ctx, { conversationId }) => {
+    const conversation = await ctx.db.get(conversationId);
+    if (!conversation || conversation.deletedAt) throw new ConvexError("Conversation unavailable.");
+    await requireMember(ctx, conversation.patientId, "recordings:create");
+    const chunk = await ctx.db.get(conversation.chunkId);
+    const job = await ctx.db.query("processingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", conversation.chunkId)).unique();
+    if (!chunk || chunk.patientId !== conversation.patientId || chunk.deletedAt || !chunk.storageId || chunk.expiresAt <= Date.now() || !job || job.patientId !== conversation.patientId) {
+      throw new ConvexError("The original audio is no longer available to retry.");
+    }
+    if ((chunk.endedAt - chunk.capturedAt) / 1000 > SARVAM_REALTIME_STT_MAX_SECONDS) {
+      throw new ConvexError(`This clip exceeds Saaras realtime transcription's ${SARVAM_REALTIME_STT_MAX_SECONDS}-second limit. New clips are capped at 25 seconds.`);
+    }
+    if (job.state === "queued" || job.state === "processing") return null;
+    if (job.state === "ready") throw new ConvexError("This conversation already has a transcript.");
+    const now = Date.now();
+    await ctx.db.patch(job._id, { state: "queued", attempts: 0, error: undefined, updatedAt: now });
+    await ctx.db.patch(chunk._id, { state: "queued" });
+    await ctx.db.patch(conversationId, { state: "queued", summary: "Transcription retry queued with Sarvam AI. Speakers remain unnamed." });
+    await ctx.scheduler.runAfter(0, transcribeRef, { jobId: job._id });
+    return null;
+  },
+});
+
+export const recoverStale = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const stale = await ctx.db.query("processingJobs")
+      .withIndex("by_state_updated", (q) => q.eq("state", "processing").lt("updatedAt", Date.now() - 10 * 60_000))
+      .take(50);
+    for (const job of stale) {
+      const chunk = await ctx.db.get(job.chunkId);
+      const conversation = await ctx.db.query("conversations").withIndex("by_chunk", (q) => q.eq("chunkId", job.chunkId)).unique();
+      if (!chunk || chunk.deletedAt || !conversation || conversation.deletedAt) {
+        await ctx.db.patch(job._id, { state: "failed", error: "Source deleted or unavailable.", updatedAt: Date.now() });
+      } else if ((job.attempts ?? 0) < MAX_ATTEMPTS && chunk.storageId && chunk.expiresAt > Date.now()) {
+        await ctx.db.patch(job._id, { state: "queued", error: "A stalled transcription will be retried.", updatedAt: Date.now() });
+        await ctx.db.patch(chunk._id, { state: "queued" });
+        await ctx.db.patch(conversation._id, { state: "queued", summary: "Transcription stalled and has been queued for another attempt. Speakers remain unnamed." });
+        await ctx.scheduler.runAfter(0, transcribeRef, { jobId: job._id });
+      } else {
+        await ctx.db.patch(job._id, { state: "failed", error: "Sarvam transcription could not be completed.", updatedAt: Date.now() });
+        await ctx.db.patch(chunk._id, { state: "failed" });
+        await ctx.db.patch(conversation._id, { state: "failed", summary: "A transcript could not be prepared. No speaker identity was inferred. You can retry while the original audio is still available." });
+      }
+    }
+    return stale.length;
+  },
+});
+
+function recordingFilename(mimeType: string): string {
+  const mime = mimeType.split(";")[0]?.trim().toLowerCase();
+  if (mime === "audio/mp4" || mime === "video/mp4" || mime === "audio/aac") return "recording.m4a";
+  if (mime === "audio/ogg") return "recording.ogg";
+  if (mime === "audio/wav" || mime === "audio/x-wav") return "recording.wav";
+  if (mime === "audio/mpeg") return "recording.mp3";
+  return "recording.webm";
+}
+
+function isRetryableSarvamError(error: unknown): boolean {
+  if (error instanceof SarvamApiError) return error.status === 429 || (error.status !== undefined && error.status >= 500);
+  if (error instanceof Error && /not configured|accepts clips up to|unsupported Sarvam|audio is required|returned no transcript|source audio is unavailable|transcript exceeded|transcription result was invalid/i.test(error.message)) return false;
+  return true;
+}

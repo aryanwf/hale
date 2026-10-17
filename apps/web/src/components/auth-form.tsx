@@ -34,14 +34,14 @@ const appearance = {
 
 function LiveAuth({ signup }: { signup: boolean }) {
   const { isLoaded, isSignedIn } = useAuth();
-  const destination = signup ? "/signup/voice" : "/family/overview";
+  const destination = "/family/overview";
   if (!isLoaded) {
     return <p role="status" className="muted">Opening a secure connection…</p>;
   }
 
   if (isSignedIn) {
     const nextStep = signup
-      ? "Next, introduce yourself and optionally set up your voice profile before connecting with your loved one."
+      ? "Next, share your family code. After your loved one connects, complete voice enrollment to finish setup."
       : "Your family dashboard is waiting for you.";
 
     return (
@@ -70,7 +70,7 @@ export function AuthPage({ signup = false }: { signup?: boolean }) {
   const live = appMode === "live";
   const introDescription = !signup
     ? "Log in to see the conversations and little moments your loved one shares with you."
-    : "Create your family account, introduce yourself, and optionally set up your voice profile. Then connect with your loved one using a private family code.";
+    : "Create your family account and share a private family code. After your loved one connects, complete voice enrollment to finish setup.";
 
   return (
     <AuthShell signup={signup}>

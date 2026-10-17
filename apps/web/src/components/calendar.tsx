@@ -53,14 +53,38 @@ export function CalendarView({ patient = false }: { patient?: boolean }) {
     requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-calendar-date="${focusDate}"]`)?.focus());
   }
 
-  return <>
-    <PageIntro eyebrow="YOUR MEMORY BANK" title={<>A day to <span className="heading-light">come back to.</span></>} description="Conversations, familiar voices, and little moments. All in one place." />
-    <div className="calendar-layout"><aside className="calendar-panel"><div className="calendar-heading"><h2>{dateLabel(monthStart, { weekday: undefined, month: "long", day: undefined, year: "numeric" })}</h2><div className="button-group"><button className="icon-button" onClick={() => changeMonth(-1)} aria-label="Previous month"><ChevronLeft size={19} /></button><button className="icon-button" onClick={() => changeMonth(1)} aria-label="Next month"><ChevronRight size={19} /></button></div></div><div className="calendar-weekdays" aria-hidden>{["M", "T", "W", "T", "F", "S", "S"].map((day, index) => <span key={index}>{day}</span>)}</div><div className="calendar-grid" role="group" aria-label="Choose a day. Use arrow keys to move between dates.">
-      {dates.map((date) => <button key={date} type="button" data-calendar-date={date} tabIndex={date === focused ? 0 : -1} aria-pressed={date === selected} aria-current={date === today ? "date" : undefined} aria-label={`${dateLabel(date, { year: "numeric" })}${recordedDays.has(date) ? ", has recordings" : ", no recordings"}`} className={`${date.slice(0, 7) !== month ? "outside-month" : ""} ${date === selected ? "selected-day" : ""} ${date === today ? "today-day" : ""}`} onKeyDown={(event) => onGridKey(event, date)} onClick={() => select(date)} onFocus={() => setFocused(date)}><span>{Number(date.slice(-2))}</span>{recordedDays.has(date) && <i aria-hidden />}</button>)}
-    </div><div className="calendar-legend"><span><i className="status-dot" />Has recordings</span><button className="text-link" onClick={() => { setMonth(today.slice(0, 7)); select(today); }}>Go to today</button></div><p className="small muted calendar-timezone">Dates shown in {space.timezone.replaceAll("_", " ")}.{mode === "demo" && " Demo date: October 15, 2026."}</p><div className="calendar-note"><Sparkles size={19} /><p>Some days have more recordings than others. An empty day is simply a day we haven’t captured.</p></div></aside>
-      <section key={selected} className="day-timeline swap-in" aria-label={`Timeline for ${dateLabel(selected)}`}><div className="day-heading"><div><p className="eyebrow">{selected === today ? "TODAY’S TIMELINE" : "A DAY IN YOUR MEMORIES"}</p><h2>{dateLabel(selected, { weekday: "long", month: "long", day: "numeric" })}</h2><p>{conversations.length} conversations · {memories.length} saved memories</p></div><Link className="btn btn-quiet" href={`${base}/ask?date=${selected}`}><Sparkles size={15} />Ask about this day</Link></div>
-        {conversations.length ? <><div className="day-recap"><p className="eyebrow">AVAILABLE DAY NOTES {mode === "demo" ? "· EXTRACTIVE DEMO" : ""}</p><p>{memories.length ? memories.map((memory) => memory.text).join(" ") : "Audio has been uploaded but is not yet processed. A recap will need transcript evidence."}</p><span className="small muted">Not a saved nightly summary. Describes available evidence, not the whole day.</span></div><div className="timeline-memories">{memories.map((memory) => <MemoryCard key={memory.id} memory={memory} base={base} />)}</div><SectionHeading title="The original conversations" /><ConversationList conversations={conversations} base={base} compact /></> : <EmptyState title="Nothing recorded on this day." description="That doesn’t mean nothing happened. Choose a day with a dot to explore the memories available."><Link href={patient ? "/patient/today" : "/family/overview"} className="text-link">Back to today<ArrowRight size={16} /></Link></EmptyState>}
+  return <div className="calendar-view">
+    <PageIntro eyebrow="YOUR MEMORIES" title="Browse memories by date" description="Choose a date to revisit saved conversations and memories." />
+    <div className="calendar-layout">
+      <aside className="calendar-panel" aria-label="Choose a date">
+        <div className="calendar-heading">
+          <div><p className="eyebrow">CALENDAR</p><h2 aria-live="polite">{dateLabel(monthStart, { weekday: undefined, month: "long", day: undefined, year: "numeric" })}</h2></div>
+          <div className="button-group">
+            <button className="icon-button" onClick={() => changeMonth(-1)} aria-label="Previous month"><ChevronLeft size={19} /></button>
+            <button className="icon-button" onClick={() => changeMonth(1)} aria-label="Next month"><ChevronRight size={19} /></button>
+          </div>
+        </div>
+        <div className="calendar-weekdays" aria-hidden>{["M", "T", "W", "T", "F", "S", "S"].map((day, index) => <span key={index}>{day}</span>)}</div>
+        <div className="calendar-grid" role="group" aria-label="Choose a day. Use arrow keys to move between dates.">
+          {dates.map((date) => <button key={date} type="button" data-calendar-date={date} tabIndex={date === focused ? 0 : -1} aria-pressed={date === selected} aria-current={date === today ? "date" : undefined} aria-label={`${dateLabel(date, { year: "numeric" })}${recordedDays.has(date) ? ", recordings available" : ""}`} className={`${date.slice(0, 7) !== month ? "outside-month" : ""} ${date === selected ? "selected-day" : ""} ${date === today ? "today-day" : ""}`} onKeyDown={(event) => onGridKey(event, date)} onClick={() => select(date)} onFocus={() => setFocused(date)}><span>{Number(date.slice(-2))}</span>{recordedDays.has(date) && <i aria-hidden />}</button>)}
+        </div>
+      </aside>
+      <section key={selected} className="day-timeline swap-in" aria-label={`Timeline for ${dateLabel(selected)}`}>
+        <div className="day-heading">
+          <div>
+            <p className="eyebrow">{selected === today ? "TODAY" : "SELECTED DAY"}</p>
+            <h2>{dateLabel(selected, { weekday: "long", month: "long", day: "numeric" })}</h2>
+            <p>{conversations.length} conversations <span aria-hidden>·</span> {memories.length} memories</p>
+          </div>
+          <Link className="btn btn-primary calendar-ask-button" href={`${base}/ask?date=${selected}`}><Sparkles size={15} />Ask about this day</Link>
+        </div>
+        {conversations.length ? <>
+          <div className="day-recap"><p className="eyebrow">AVAILABLE NOTES {mode === "demo" ? "· DEMO" : ""}</p><p>{memories.length ? memories.map((memory) => memory.text).join(" ") : "No transcript-based notes are available for these recordings yet."}</p><span className="small muted">These notes cover available evidence, not necessarily the whole day.</span></div>
+          <div className="timeline-memories">{memories.map((memory) => <MemoryCard key={memory.id} memory={memory} base={base} />)}</div>
+          <SectionHeading title="Original conversations" />
+          <ConversationList conversations={conversations} base={base} compact />
+        </> : <EmptyState title="No recordings for this day" description="No conversations or memories are available for this date yet."><Link href={patient ? "/patient/today" : "/family/overview"} className="text-link">Back to today<ArrowRight size={16} /></Link></EmptyState>}
       </section>
     </div>
-  </>;
+  </div>;
 }

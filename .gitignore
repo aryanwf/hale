@@ -12,16 +12,22 @@ coverage/
 # Project-local OpenCode configuration
 /opencode.json
 
+# Personal project plan; keep local and out of commits
+/plan.md
+
 .env*
 !.env.example
 !.env.*.example
 .DS_Store
+*:Zone.Identifier
 __pycache__/
 .venv/
 .pytest_cache/
 test-results/
 playwright-report/
 .next-e2e/
-
-# Personal, local-only implementation notes
-/plan.md
+.expo/
+/apps/mobile/android/
+/apps/mobile/ios/
+/apps/mobile/dist/
+/apps/mobile/build/

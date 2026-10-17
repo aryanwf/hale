@@ -5,7 +5,10 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./api": "./src/api.ts",
+    "./audio": "./src/audio.ts",
     "./demo": "./src/demo.ts",
+    "./family-link": "./src/family-link.ts",
     "./recall": "./src/recall.ts",
     "./time": "./src/time.ts",
     "./voice": "./src/voice.ts",

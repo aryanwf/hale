@@ -2,6 +2,7 @@ import { httpRouter, makeFunctionReference } from "convex/server";
 import { httpAction } from "./lib/functions";
 import type { GenericId } from "convex/values";
 import { validateVoiceWav, VOICE_MAX_BYTES } from "@hale/contracts/voice";
+import { MAX_AUDIO_BYTES } from "@hale/contracts/audio";
 
 const http = httpRouter();
 const acceptChunk = makeFunctionReference<"mutation">("recordings:acceptChunk");
@@ -26,18 +27,20 @@ http.route({
   path: "/audio", method: "POST",
   handler: httpAction(async (ctx, request) => {
     const headers = { ...cors(request.headers.get("origin")), "Cache-Control": "no-store" };
-    if (!process.env.APP_ORIGIN || request.headers.get("origin") !== process.env.APP_ORIGIN) return new Response("Origin not allowed.", { status: 403, headers });
+    // Native clients have no Origin header; bearer authentication and membership still apply.
+    const origin = request.headers.get("origin");
+    if (origin !== null && (!process.env.APP_ORIGIN || origin !== process.env.APP_ORIGIN)) return new Response("Origin not allowed.", { status: 403, headers });
     if (!await ctx.auth.getUserIdentity()) return new Response("Sign in required.", { status: 401, headers });
     const url = new URL(request.url);
     const contentType = request.headers.get("content-type") ?? "";
     if (!/^(audio\/(mp4|webm|ogg|wav|x-wav|mpeg)|video\/mp4)(;|$)/i.test(contentType)) return new Response("Unsupported audio container.", { status: 415, headers });
-    if (Number(request.headers.get("content-length")) > 20_000_000) return new Response("Segment too large.", { status: 413, headers });
+    if (Number(request.headers.get("content-length")) > MAX_AUDIO_BYTES) return new Response("Segment too large.", { status: 413, headers });
     let storageId: GenericId<"_storage"> | undefined;
     try {
       // Check membership before accepting bytes, then recheck atomically at finalization.
       await ctx.runQuery(authorizeUpload, { sessionId: url.searchParams.get("sessionId") });
       const blob = await request.blob();
-      if (!blob.size || blob.size > 20_000_000) return new Response("Empty or oversized segment.", { status: 413, headers });
+      if (!blob.size || blob.size > MAX_AUDIO_BYTES) return new Response("Empty or oversized segment.", { status: 413, headers });
       storageId = await ctx.storage.store(blob);
       const result = await ctx.runMutation(acceptChunk, {
         sessionId: url.searchParams.get("sessionId"), sequence: Number(url.searchParams.get("sequence")),

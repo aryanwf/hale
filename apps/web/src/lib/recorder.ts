@@ -1,7 +1,6 @@
 import type { SegmentUpload } from "@/components/providers";
 
-// Saaras v4's realtime upload accepts clips up to 30 seconds; leave room for timer jitter.
-export const SEGMENT_MS = 25_000;
+export const SEGMENT_MS = 45_000;
 export const MAX_PENDING_SEGMENTS = 3;
 const MAX_LOCAL_BYTES = 20_000_000;
 export const MIME_CANDIDATES = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
@@ -24,7 +23,7 @@ export interface CaptureSnapshot {
 
 interface Adapter {
   mode: "demo" | "live";
-  beginSession: () => Promise<string>;
+  beginSession: (expectedPeople: string[]) => Promise<string>;
   setSessionState: (id: string, state: "recording" | "paused" | "interrupted" | "stopped") => Promise<void>;
   uploadSegment: (sessionId: string, segment: SegmentUpload) => Promise<void>;
 }
@@ -57,7 +56,7 @@ export class ForegroundRecorder {
     for (const listener of this.listeners) listener();
   }
 
-  async start() {
+  async start(expectedPeople: string[] = []) {
     if (this.transitioning || ["starting", "recording"].includes(this.snapshot.phase)) return;
     if (this.snapshot.segments.length >= MAX_PENDING_SEGMENTS) { this.update({ message: "Save or discard local segments before recording more." }); return; }
     const attempt = ++this.generation;
@@ -74,7 +73,7 @@ export class ForegroundRecorder {
       }
       this.stream = stream;
       const resuming = !!this.session;
-      const session = this.session ?? await this.adapter.beginSession();
+       const session = this.session ?? await this.adapter.beginSession(expectedPeople);
       if (!this.alive || attempt !== this.generation || document.visibilityState !== "visible") {
         stream.getTracks().forEach((track) => track.stop());
         await this.adapter.setSessionState(session, "stopped").catch(() => {});
@@ -99,7 +98,7 @@ export class ForegroundRecorder {
       }, 1000);
     } catch (error) {
       this.releaseStream();
-      this.update({ phase: "failed", message: error instanceof DOMException && error.name === "NotAllowedError" ? "Microphone access was denied. Allow it in Safari’s website settings, then try again." : error instanceof Error ? error.message : "The microphone couldn’t start. Try again." });
+      this.update({ phase: "failed", message: error instanceof DOMException && error.name === "NotAllowedError" ? "Microphone access was denied. Allow it in your browser’s site settings, then try again." : error instanceof Error ? error.message : "The microphone couldn’t start. Try again." });
     }
   }
 
@@ -189,8 +188,8 @@ export class ForegroundRecorder {
       await this.adapter.uploadSegment(next.sessionId, next);
       URL.revokeObjectURL(next.url);
       this.update({ segments: this.snapshot.segments.filter((segment) => segment !== next), uploaded: this.snapshot.uploaded + 1 });
-    } catch (cause) {
-      next.error = cause instanceof Error ? cause.message : "Upload failed. Your audio is still saved on this device.";
+    } catch {
+      next.error = "Upload failed. Keep this page open and retry.";
       this.update({ segments: [...this.snapshot.segments] });
       if (next.attempts < 3) this.retryTimer = setTimeout(() => { next.error = undefined; void this.drain(); }, next.attempts * 2000);
     } finally {

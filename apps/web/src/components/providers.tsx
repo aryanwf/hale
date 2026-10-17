@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { Component, createContext, useContext, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ClerkProvider, UserButton, useAuth } from "@clerk/nextjs";
 import { ConvexReactClient, useConvexAuth, useMutation, useQuery } from "convex/react";
@@ -9,7 +9,8 @@ import type { PatientSpace } from "@hale/contracts";
 import { demoSpace, DEMO_TODAY } from "@hale/contracts/demo";
 import { localDate } from "@hale/contracts/time";
 import { api, type PatientInfo } from "@/lib/api";
-import { ArrowRight, Leaf, ShieldCheck } from "lucide-react";
+import { ArrowRight, Leaf } from "lucide-react";
+import { FamilyConnection } from "./family-connection";
 import { appMode } from "@/lib/app-mode";
 
 export interface SegmentUpload { blob: Blob; sequence: number; capturedAt: number; endedAt: number }
@@ -22,7 +23,7 @@ interface Workspace {
   deleteConversation: (id: string) => Promise<void>;
   resetDemo?: () => void;
   account: ReactNode;
-  beginSession: () => Promise<string>;
+  beginSession: (expectedPeople: string[]) => Promise<string>;
   setSessionState: (id: string, state: "recording" | "paused" | "interrupted" | "stopped") => Promise<void>;
   uploadSegment: (sessionId: string, segment: SegmentUpload) => Promise<void>;
 }
@@ -60,7 +61,7 @@ function LiveSpace({ patientId, patients, selectPatient, children }: { patientId
     mode: "live", space, today: localDate(new Date(), space.timezone), patients, selectPatient,
     account: <UserButton />,
     deleteConversation: async (conversationId) => { await remove({ conversationId }); },
-    beginSession: () => begin({ patientId, participantsConsented: true }),
+    beginSession: (expectedPeople) => begin({ patientId, participantsConsented: true, expectedPeople }),
     setSessionState: async (sessionId, state) => { await setState({ sessionId, state }); },
     uploadSegment: async (sessionId, segment) => {
       const token = await getToken({ template: "convex" });
@@ -69,61 +70,71 @@ function LiveSpace({ patientId, patients, selectPatient, children }: { patientId
       if (!origin) throw new Error("Convex HTTP URL is not configured.");
       const url = new URL("/audio", origin);
       for (const [key, value] of Object.entries({ sessionId, sequence: segment.sequence, capturedAt: segment.capturedAt, endedAt: segment.endedAt })) url.searchParams.set(key, String(value));
-      let response: Response;
-      try {
-        response = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": segment.blob.type }, body: segment.blob, cache: "no-store" });
-      } catch {
-        throw new Error("Could not reach the Convex upload endpoint. Check the Convex HTTP URL, APP_ORIGIN, CORS, and network connection; your audio is still saved on this device.");
-      }
-      if (!response.ok) {
-        const detail = (await response.text().catch(() => "")).trim().slice(0, 180);
-        throw new Error(`Upload failed (HTTP ${response.status})${detail ? `: ${detail}` : ". Your audio is still saved on this device."}`);
-      }
+      const response = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": segment.blob.type }, body: segment.blob, cache: "no-store" });
+      if (!response.ok) throw new Error("Upload failed. Keep this page open and try again.");
     },
   }}>{children}</WorkspaceContext.Provider>;
+}
+
+function DeletedAccountGate() {
+  return <Gate title="Your Hale account was deleted." description="Your Hale data has already been removed. Finish deleting your sign-in account or create a new account.">
+    <div className="button-group"><Link href="/account/delete" className="btn btn-primary">Finish deleting sign-in account</Link><Link href="/signup" className="btn btn-quiet">Create a new account</Link><UserButton /></div>
+  </Gate>;
 }
 
 function LiveGate({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth();
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
-  const patients = useQuery(api.patients, isAuthenticated ? {} : "skip");
-  const family = useQuery(api.voiceProfile, isAuthenticated ? {} : "skip");
+  const accountStatus = useQuery(api.accountStatus, isAuthenticated ? {} : "skip");
+  const accountIsActive = isAuthenticated && accountStatus === "active";
+  const patients = useQuery(api.patients, accountIsActive ? { role: "family" } : "skip");
   const [selected, setSelected] = useState<string>();
+
   if (!isLoaded) return <Gate title="A moment for your memories…" />;
-  if (!isSignedIn) return <Gate title="Your memories. Your space." description="Sign in to open your private memory bank. Only people you authorize can access it."><div className="button-group"><Link href="/login" className="btn btn-primary">Log in <ArrowRight size={17} /></Link><Link href="/signup" className="btn btn-quiet">Create an account</Link></div></Gate>;
+  if (!isSignedIn) return <Gate title="A little closer, even from afar." description="Sign in to see the memories your loved one shares with your family account."><div className="button-group"><Link href="/login" className="btn btn-primary">Log in <ArrowRight size={17} /></Link><Link href="/signup" className="btn btn-quiet">Create a family account</Link></div></Gate>;
   if (authLoading) return <Gate title="Connecting securely…" />;
   if (!isAuthenticated) return <Gate title="Your memory connection needs attention." description="Your account is signed in, but Convex could not authenticate it. Check the Clerk convex JWT template and deployment issuer configuration."><UserButton /></Gate>;
-  if (!patients || !family) return <Gate title="Finding your memory space…" />;
-  if (!patients.length && family.profile) return <Gate title="You’re part of the circle." description="Your family account is ready. Ask a patient-space administrator for a private invitation to join. Creating an account or a voice profile never grants access to someone’s memories."><div className="button-group"><Link href="/signup/voice" className="btn btn-primary">Manage my voice profile <ArrowRight size={17} /></Link><UserButton /></div></Gate>;
+  if (accountStatus === undefined) return <Gate title="Checking your account…" />;
+  if (accountStatus === "deleted") return <DeletedAccountGate />;
+  if (accountStatus !== "active") return <Gate title="Your memory connection needs attention." description="Please reconnect your sign-in account to continue."><UserButton /></Gate>;
+  if (!patients) return <Gate title="Finding your memory space…" />;
   if (!patients.length) return <Onboarding />;
   const patientId = patients.find((patient) => patient.id === selected)?.id ?? patients[0].id;
   return <LiveSpace key={patientId} patientId={patientId} patients={patients} selectPatient={setSelected}>{children}</LiveSpace>;
 }
 
 function Onboarding() {
-  const createPatient = useMutation(api.createPatient);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  return <Gate title="A little introduction." description="Create your own patient space. For this prototype, use a fictional name and consented test audio only.">
-    <form className="onboarding-form" onSubmit={async (event) => {
-      event.preventDefault(); setBusy(true); setError("");
-      const data = new FormData(event.currentTarget);
-      try { await createPatient({ name: String(data.get("name")), timezone: String(data.get("timezone")), recordingConsent: data.get("consent") === "on" }); }
-      catch { setError("We couldn’t create your space. Check your details and try again."); }
-      finally { setBusy(false); }
-    }}>
-      <label>Your display name<input name="name" required minLength={2} maxLength={100} placeholder="e.g. Margaret Okafor" /></label>
-      <label>Your timezone<input name="timezone" required defaultValue={Intl.DateTimeFormat().resolvedOptions().timeZone} /></label>
-      <div className="notice"><ShieldCheck size={20} /><p>Recordings are sent to Sarvam AI for transcription. If you choose spoken playback, the answer text is sent to Sarvam AI for speech synthesis. Audio playback expires after 7 days; transcripts remain until deleted. Cloud processing is not end-to-end encrypted. This prototype is not a medical service.</p></div>
-      <label className="check-label"><input type="checkbox" name="consent" required /><span>I understand that recordings are processed by Sarvam AI and consent to test recordings. Everyone in each conversation must also agree.</span></label>
-      {error && <p role="alert" className="error-text">{error}</p>}
-      <button className="btn btn-primary" disabled={busy}>{busy ? "Creating…" : "Create my space"}<ArrowRight size={17} /></button>
-    </form>
+  return <Gate title="Welcome to your family dashboard." description="Start by connecting with your loved one. Patient spaces are created in the Android app, not here.">
+    <UserButton /><FamilyConnection embedded /><p className="small muted"><Link href="/account/delete">Delete account</Link></p>
   </Gate>;
 }
 
 export function Gate({ title, description, children }: { title: string; description?: string; children?: ReactNode }) {
   return <main className="gate"><Link className="wordmark" href="/"><Leaf size={23} />hale.</Link><p className="eyebrow">YOUR MEMORIES, ALWAYS WITHIN REACH.</p><h1>{title}</h1>{description && <p className="gate-description">{description}</p>}{children}</main>;
+}
+
+class WorkspaceErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+
+    return (
+      <Gate
+        title="Your Hale space couldn’t be opened."
+        description="Use the account menu to sign out, then tap Try again to sign in with an active account or create one. If you deleted your Hale data, finish deleting your sign-in account."
+      >
+        <UserButton />
+        <button className="btn btn-quiet" type="button" onClick={() => this.setState({ failed: false })}>
+          Try again
+        </button>
+      </Gate>
+    );
+  }
 }
 
 function configuredClient() {
@@ -136,11 +147,11 @@ export function AppProviders({ children }: { children: ReactNode }) {
   if (appMode === "demo") return <DemoProvider>{children}</DemoProvider>;
   if (appMode === "invalid") return <Gate title="Choose a valid app mode." description="NEXT_PUBLIC_APP_MODE must be demo or live. An invalid configuration never silently opens a different data source." />;
   if (!convex || !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return <Gate title="Your live connection isn’t configured." description="Set the Clerk and Convex variables in apps/web/.env.local, or explicitly select demo mode. Private data is never replaced with demo data after a connection error." />;
-  return <ClerkProvider signInUrl="/login" signUpUrl="/signup" signInFallbackRedirectUrl="/family/overview" signUpFallbackRedirectUrl="/signup/voice"><ConvexProviderWithClerk client={convex} useAuth={useAuth}>{children}</ConvexProviderWithClerk></ClerkProvider>;
+  return <ClerkProvider signInUrl="/login" signUpUrl="/signup" signInFallbackRedirectUrl="/family/overview" signUpForceRedirectUrl="/family/overview" signUpFallbackRedirectUrl="/family/overview"><ConvexProviderWithClerk client={convex} useAuth={useAuth}>{children}</ConvexProviderWithClerk></ClerkProvider>;
 }
 
 // Public auth/onboarding routes need identity/backend providers, not a patient workspace.
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   if (appMode !== "live") return children;
-  return <LiveGate>{children}</LiveGate>;
+  return <WorkspaceErrorBoundary><LiveGate>{children}</LiveGate></WorkspaceErrorBoundary>;
 }

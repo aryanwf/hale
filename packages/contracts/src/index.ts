@@ -20,6 +20,7 @@ export interface Person {
   relationship: string;
   initials: string;
   enrollment: "not_enrolled" | "enrolled" | "revoked";
+  voiceMatchingAvailable: boolean;
   color: "green" | "blue" | "sand";
 }
 
@@ -42,8 +43,6 @@ export interface Conversation {
   people: string[];
   state: ProcessingState;
   turns: TranscriptTurn[];
-  audioAvailable: boolean;
-  audioUrl?: string;
   synthetic: boolean;
 }
 

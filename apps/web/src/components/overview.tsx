@@ -1,146 +1,149 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { ArrowRight, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock3, Headphones, Mic, ShieldCheck, Sparkles, Users } from "lucide-react";
-import type { Conversation, Memory } from "@hale/contracts";
-import { memoryLabels } from "@hale/contracts";
-import { clockLabel, dateLabel, durationLabel, isLocalDate, localDate, shiftDate } from "@hale/contracts/time";
+import Link from "next/link";
+import { ArrowRight, CalendarDays, CarFront, ChevronLeft, ChevronRight, CircleAlert, Clock3, MessageCircle, Mic, Users } from "lucide-react";
+import { memoryLabels, type Memory } from "@hale/contracts";
+import { clockLabel, dateLabel, localDate, shiftDate } from "@hale/contracts/time";
 import { useWorkspace } from "./providers";
-import { Coverage, PeopleStack, PrivacyNote } from "./ui";
+import { EmptyState, StatusPill } from "./ui";
+
+function memorySourceHref(memory: Memory) {
+  const turn = memory.turnIds[0];
+  return `/family/conversations/${memory.conversationId}${turn ? `#${turn}` : ""}`;
+}
 
 export function Overview() {
-  const { space, today, mode } = useWorkspace();
-  const router = useRouter();
-  const params = useSearchParams();
-  const rawDate = params.get("date");
-  const selectedDate = isLocalDate(rawDate) ? rawDate : today;
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const conversations = space.conversations
-    .filter((conversation) => localDate(conversation.startedAt, space.timezone) === selectedDate)
-    .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
-  const memories = space.memories.filter((memory) => memory.localDate === selectedDate);
-  const people = space.people
-    .filter((person) => person.relationship !== "You · patient")
-    .map((person) => {
-      const personConversations = conversations.filter((conversation) => conversation.people.includes(person.id));
-      const latest = [...space.conversations]
-        .filter((conversation) => conversation.people.includes(person.id))
-        .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
-      return { person, personConversations, latest };
-    })
-    .filter(({ personConversations }) => personConversations.length > 0);
-  const unknownTurns = conversations.reduce((count, conversation) => count + conversation.turns.filter((turn) => turn.uncertain || !turn.personId).length, 0);
-  const readyCount = conversations.filter((conversation) => conversation.state === "ready").length;
-  const totalSeconds = conversations.reduce((total, conversation) => total + conversation.duration, 0);
+  const { space, today } = useWorkspace();
+  const [calendarMonth, setCalendarMonth] = useState(today.slice(0, 7));
+  const conversations = space.conversations.filter((conversation) => localDate(conversation.startedAt, space.timezone) === today);
+  const memories = space.memories.filter((memory) => memory.localDate === today);
+  const recent = [...space.conversations].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 4);
+  const queued = conversations.filter((conversation) => conversation.state === "queued").length;
+  const processing = conversations.filter((conversation) => conversation.state === "processing").length;
+  const pending = queued + processing;
+  const failed = conversations.filter((conversation) => conversation.state === "failed").length;
+  const calendarMonthStart = `${calendarMonth}-01`;
+  const firstWeekday = new Date(`${calendarMonthStart}T12:00:00Z`).getUTCDay();
+  const calendarStart = shiftDate(calendarMonthStart, -((firstWeekday + 6) % 7));
+  const calendarDates = Array.from({ length: 42 }, (_, index) => shiftDate(calendarStart, index));
+  const recordedDays = new Set(space.conversations.map((conversation) => localDate(conversation.startedAt, space.timezone)));
 
-  const activeExpandedId = conversations.some((conversation) => conversation.id === expandedId) ? expandedId : conversations[0]?.id;
-
-  function selectDate(date: string) {
-    router.push(`/family/overview?date=${date}`, { scroll: false });
+  function changeCalendarMonth(offset: number) {
+    const instant = new Date(`${calendarMonthStart}T12:00:00Z`);
+    instant.setUTCMonth(instant.getUTCMonth() + offset);
+    setCalendarMonth(instant.toISOString().slice(0, 7));
   }
 
-  const contextCopy = conversations.length
-    ? memories.length
-      ? `${conversations.length} recorded ${conversations.length === 1 ? "conversation" : "conversations"} and ${memories.length} saved ${memories.length === 1 ? "memory" : "memories"} are available for this day.`
-      : `${conversations.length} recorded ${conversations.length === 1 ? "conversation is" : "conversations are"} available. Saved memories will appear after processing.`
-    : selectedDate === today
-      ? "Nothing has been recorded for today yet. Start a consented session when you’re ready."
-      : `No recorded conversations are available for ${dateLabel(selectedDate, { weekday: "long", month: "long", day: "numeric" })}.`;
-
-  return <div className="archive-page">
-    <section className="archive-hero" aria-labelledby="archive-title">
-      <div className="archive-hero-copy">
-        <p className="archive-kicker"><span className="archive-live-dot" />{mode === "demo" ? "Demo archive · synthetic records" : "Private family archive"}</p>
-        <h1 id="archive-title">A day<br /><em>in context.</em></h1>
-        <p className="archive-hero-description">{contextCopy}</p>
-        <div className="archive-hero-actions">
-          <Link className="btn btn-primary" href={`/family/ask?date=${selectedDate}`}><Sparkles size={16} />Ask Hale</Link>
-          <Link className="archive-secondary-action" href={`/family/calendar?date=${selectedDate}`}>Open the calendar<ArrowRight size={15} /></Link>
-        </div>
-        <p className="archive-evidence-note"><ShieldCheck size={15} />Only recorded words and saved memories appear here.</p>
+  return <>
+    <header className="overview-header">
+      <div>
+        <h1>Family dashboard</h1>
+        <p className="overview-subtitle">{space.name} <span aria-hidden="true">·</span> {dateLabel(today, { weekday: "long", month: "long", day: "numeric" })}</p>
       </div>
-      <div className="archive-hero-art" aria-label={`Memory archive for ${space.name}`} role="img">
-        <div className="archive-filmstrip" aria-hidden>{Array.from({ length: 7 }, (_, index) => <span key={index} />)}</div>
-        <div className="archive-paper">
-          <div className="archive-paper-top"><span>HALE / ARCHIVE</span><span>{selectedDate.slice(0, 4)}</span></div>
-          <div className="archive-paper-middle"><div className="archive-portrait">{space.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div><div className="archive-paper-copy"><span>ARCHIVE OWNER</span><strong>{space.name}</strong><span>{selectedDate === today ? "Today" : dateLabel(selectedDate, { month: "short", day: "numeric", year: "numeric" })}</span></div></div>
-          <div className="archive-paper-rule" />
-          <div className="archive-paper-bottom"><span>WORDS / MOMENTS / PEOPLE</span><span className="archive-paper-stamp">PRIVATE</span></div>
+      <Link className="btn btn-primary overview-ask-button" href={`/family/calendar?date=${today}`}><CalendarDays size={17} />View today<ArrowRight size={15} /></Link>
+    </header>
+
+    <nav className="overview-stat-grid" aria-label="Family dashboard summary">
+      <Link className="overview-stat" href={`/family/calendar?date=${today}`}><span>Recordings today</span><strong>{conversations.length}</strong></Link>
+      <Link className="overview-stat" href={`/family/calendar?date=${today}`}><span>Memories today</span><strong>{memories.length}</strong></Link>
+      <Link className="overview-stat" href="/family/people"><span>People profiles</span><strong>{space.people.length}</strong></Link>
+      <Link className="overview-stat" href="/family/conversations"><span>Pending</span><strong>{pending}</strong></Link>
+    </nav>
+
+    {failed > 0 && <div className="overview-attention" role="status">
+      <CircleAlert size={18} /><p><strong>{failed} {failed === 1 ? "recording needs" : "recordings need"} review.</strong> Check its processing status in Conversations.</p>
+      <Link href="/family/conversations">Review recordings<ArrowRight size={14} /></Link>
+    </div>}
+
+    <div className="overview-support-grid">
+      <section className="overview-section overview-calendar" aria-labelledby="overview-calendar-title">
+        <div className="overview-section-heading">
+          <div><h2 id="overview-calendar-title">Calendar</h2><p>Choose a date to explore its timeline</p></div>
+          <Link href={`/family/calendar?date=${today}`}>Open calendar<ArrowRight size={14} /></Link>
         </div>
-        <p className="archive-art-caption">A living record, made from moments that were intentionally captured.</p>
-      </div>
-    </section>
-
-    <div className="archive-datebar"><DateNavigator selectedDate={selectedDate} today={today} onSelect={selectDate} /><Link className="archive-calendar-link" href={`/family/calendar?date=${selectedDate}`}><CalendarDays size={15} />Full calendar<ArrowRight size={14} /></Link></div>
-
-    <section className="archive-stats" aria-label={`Summary for ${dateLabel(selectedDate)}`}>
-      <ArchiveStat index="01" value={conversations.length} label="recorded conversations" detail={conversations.length ? `${durationLabel(totalSeconds)} of available audio` : "Nothing captured on this date"} />
-      <ArchiveStat index="02" value={people.length} label="familiar voices" detail={people.length ? "People linked to today’s recordings" : "Known speakers appear after identification"} />
-      <ArchiveStat index="03" value={memories.length} label="saved memories" detail={memories.length ? "Sourced from the conversations below" : "Saved after processing and review"} />
-    </section>
-
-    <div className="archive-content-grid">
-      <main className="archive-main-column">
-        {conversations.length ? <section className="archive-timeline" aria-labelledby="timeline-title">
-          <div className="archive-section-header"><div><p className="archive-section-kicker">THE DAY, AS RECORDED</p><h2 id="timeline-title">A thread of moments</h2></div><span className="archive-section-count">{conversations.length} {conversations.length === 1 ? "moment" : "moments"}</span></div>
-          <p className="archive-section-intro">Open a moment to see its source, saved memories, and the people Hale could link to it.</p>
-          <div className="archive-timeline-list">
-            {conversations.map((conversation) => <TimelineEvent key={conversation.id} conversation={conversation} memories={memories.filter((memory) => memory.conversationId === conversation.id)} timezone={space.timezone} expanded={activeExpandedId === conversation.id} onToggle={() => setExpandedId((current) => current === conversation.id ? null : conversation.id)} />)}
+        <div className="overview-calendar-panel">
+          <div className="overview-calendar-month-heading">
+            <h3>{dateLabel(calendarMonthStart, { weekday: undefined, month: "long", day: undefined, year: "numeric" })}</h3>
+            <div className="overview-calendar-month-controls">
+              <button type="button" className="overview-calendar-nav-button" aria-label="Previous month" onClick={() => changeCalendarMonth(-1)}><ChevronLeft size={16} /></button>
+              <button type="button" className="overview-calendar-nav-button" aria-label="Next month" onClick={() => changeCalendarMonth(1)}><ChevronRight size={16} /></button>
+            </div>
           </div>
-          <ArchiveQuestions selectedDate={selectedDate} />
-        </section> : <ArchiveEmpty selectedDate={selectedDate} today={today} />}
-      </main>
-      <aside className="archive-side-column">
-        <section className="archive-support-section"><div className="archive-section-header"><div><p className="archive-section-kicker">THE DAY, AT A GLANCE</p><h2>Coverage</h2></div><Clock3 size={18} aria-hidden /></div><Coverage conversations={conversations} base="/family" /></section>
-        <FamiliarPeople people={people} unknownTurns={unknownTurns} timezone={space.timezone} />
-        <section className="archive-insights"><p className="archive-section-kicker">FAMILY INSIGHT</p><div className="archive-insight-note"><span className="archive-insight-mark">{readyCount}</span><div><h2>{readyCount ? `${readyCount} ${readyCount === 1 ? "conversation is" : "conversations are"} ready to revisit.` : "The archive is still taking shape."}</h2><p>{conversations.length ? `${memories.length ? `${memories.length} sourced ${memories.length === 1 ? "memory is" : "memories are"} linked to this day. ` : "No saved memories have been extracted from this day yet. "}Plans remain plans; a recording is evidence of words, not proof that an activity happened.` : "Once a consented conversation is processed, its source and any saved memories will live here."}</p></div></div></section>
-        <PrivacyNote>Hale keeps the gaps visible. An unrecorded period does not tell us what happened.</PrivacyNote>
+          <div className="overview-calendar-weekdays" aria-hidden="true">
+            {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => <span key={index}>{day}</span>)}
+          </div>
+          <div className="overview-calendar-grid" role="group" aria-label={`Choose a date in ${dateLabel(calendarMonthStart, { month: "long", year: "numeric" })}`}>
+            {calendarDates.map((date) => {
+              const hasRecordings = recordedDays.has(date);
+              return <Link
+                key={date}
+                href={`/family/calendar?date=${date}`}
+                className={`overview-calendar-day${date.slice(0, 7) !== today.slice(0, 7) ? " outside-month" : ""}${date === today ? " today-day" : ""}`}
+                aria-current={date === today ? "date" : undefined}
+                aria-label={`${dateLabel(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}${hasRecordings ? ", recordings available" : ""}`}
+              >
+                <span>{Number(date.slice(-2))}</span>
+                {hasRecordings && <i aria-hidden="true" />}
+              </Link>;
+            })}
+          </div>
+        </div>
+      </section>
+
+      <aside className="overview-section overview-quick-access" aria-labelledby="overview-quick-access-title">
+        <div className="overview-section-heading"><h2 id="overview-quick-access-title">Quick access</h2></div>
+        <nav aria-label="Main features">
+          <Link href={`/family/ask?date=${today}`}><MessageCircle size={18} /><span>Ask Hale</span><ChevronRight size={15} /></Link>
+          <Link href={`/family/calendar?date=${today}`}><CalendarDays size={18} /><span>Calendar</span><ChevronRight size={15} /></Link>
+          <Link href="/family/people"><Users size={18} /><span>People</span><ChevronRight size={15} /></Link>
+          <Link href="/family/care"><CarFront size={18} /><span>Care and tasks</span><ChevronRight size={15} /></Link>
+          <Link href="/patient/today"><Mic size={18} /><span>Recording view</span><ChevronRight size={15} /></Link>
+        </nav>
       </aside>
     </div>
-  </div>;
-}
 
-function DateNavigator({ selectedDate, today, onSelect }: { selectedDate: string; today: string; onSelect: (date: string) => void }) {
-  const label = selectedDate === today ? "Today" : dateLabel(selectedDate, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
-  return <div className="archive-date-controls"><button className="archive-date-arrow" type="button" aria-label="Show the previous day" onClick={() => onSelect(shiftDate(selectedDate, -1))}><ChevronLeft size={17} /></button><Link className="archive-date-current" href={`/family/calendar?date=${selectedDate}`}><span>{label}</span><small>{selectedDate}</small></Link><button className="archive-date-arrow" type="button" aria-label="Show the next day" onClick={() => onSelect(shiftDate(selectedDate, 1))}><ChevronRight size={17} /></button>{selectedDate !== today && <button className="archive-today-button" type="button" onClick={() => onSelect(today)}>Today</button>}</div>;
-}
+    <div className="overview-feature-grid">
+      <section className="overview-section overview-feature" aria-labelledby="overview-memories-title">
+        <div className="overview-section-heading">
+          <div><h2 id="overview-memories-title">Memories today</h2><p>Source-linked notes from today’s recordings</p></div>
+          <Link href={`/family/calendar?date=${today}`} aria-label="View today's memories">View day<ArrowRight size={14} /></Link>
+        </div>
+        {memories.length ? <ul className="overview-memory-list">
+          {memories.slice(0, 3).map((memory) => {
+            const source = space.conversations.find((item) => item.id === memory.conversationId);
+            return <li key={memory.id}><Link className="overview-memory-row" href={memorySourceHref(memory)}>
+              <span className={`overview-memory-kind ${memory.kind === "plan" ? "is-plan" : ""}`}>{memoryLabels[memory.kind]}</span>
+              <span className="overview-memory-copy"><strong>{memory.title}</strong><span>{memory.text}</span>
+                {memory.kind === "plan" && <small className="overview-memory-caveat">Plan, not confirmed event</small>}
+                <small className="overview-memory-source"><Clock3 size={13} />{source ? clockLabel(source.startedAt, space.timezone) : "Source unavailable"} · Open source</small>
+              </span>
+              <ChevronRight size={17} />
+            </Link></li>;
+          })}
+        </ul> : <EmptyState title="No memories saved today" description={conversations.length ? "You can still review each recording and its status." : "Available notes will appear here after a conversation is recorded and processed."}>
+          {!conversations.length && <Link className="text-link" href="/patient/today"><Mic size={15} />Open recording view</Link>}
+        </EmptyState>}
+      </section>
 
-function ArchiveStat({ index, value, label, detail }: { index: string; value: number; label: string; detail: string }) {
-  return <div className={`archive-stat ${value === 0 ? "is-empty" : ""}`}><span className="archive-stat-index">{index}</span><strong>{value}</strong><span className="archive-stat-label">{label}</span><p>{detail}</p></div>;
-}
-
-function TimelineEvent({ conversation, memories, timezone, expanded, onToggle }: { conversation: Conversation; memories: Memory[]; timezone: string; expanded: boolean; onToggle: () => void }) {
-  const firstTurn = conversation.turns.find((turn) => !turn.uncertain) ?? conversation.turns[0];
-  const excerpt = firstTurn?.text ?? conversation.summary;
-  const stateLabel = { ready: "Ready to revisit", queued: "Awaiting transcript", processing: "Still processing", failed: "Processing needs attention" }[conversation.state];
-  return <article className={`archive-event ${expanded ? "is-expanded" : ""}`}>
-    <div className="archive-event-time"><time dateTime={conversation.startedAt}>{clockLabel(conversation.startedAt, timezone)}</time><span>{durationLabel(conversation.duration)}</span></div>
-    <div className="archive-event-main">
-      <span className="archive-event-marker" aria-hidden />
-      <button className="archive-event-trigger" type="button" aria-expanded={expanded} aria-controls={`archive-event-${conversation.id}`} onClick={onToggle}><span className="archive-event-heading">{conversation.title}</span><ChevronDown className="archive-event-chevron" size={18} aria-hidden /></button>
-      <div className="archive-event-meta"><PeopleStack ids={conversation.people} names /><span className="archive-event-status"><span className={conversation.state === "ready" ? "archive-status-dot" : "archive-status-ring"} />{stateLabel}</span></div>
-      <p className="archive-event-excerpt">“{excerpt}”</p>
-      <div id={`archive-event-${conversation.id}`} className="archive-event-details" hidden={!expanded}>
-        <div className="archive-event-source"><span>{firstTurn ? (firstTurn.uncertain ? "Transcript excerpt · speaker attribution uncertain" : "Transcript excerpt") : "Processing summary"}</span><span>{conversation.synthetic ? "Synthetic example" : "Recorded evidence"}</span></div>
-        {conversation.audioAvailable && conversation.audioUrl ? <audio className="archive-audio" controls preload="metadata" src={conversation.audioUrl}>Your browser does not support audio playback.</audio> : conversation.audioAvailable ? <Link className="archive-audio-link" href={`/family/conversations/${conversation.id}`}><Headphones size={15} />Open the recording<ArrowRight size={14} /></Link> : null}
-        {memories.length ? <div className="archive-memory-links"><p className="archive-detail-label">SAVED FROM THIS MOMENT</p>{memories.map((memory) => <Link key={memory.id} className="archive-memory-link" href={`/family/conversations/${memory.conversationId}#${memory.turnIds[0]}`}><span><small>{memoryLabels[memory.kind]}</small><strong>{memory.title}</strong><span>{memory.text}</span></span><ArrowRight size={15} /></Link>)}</div> : <p className="archive-no-memory">No saved memory is linked to this conversation yet.</p>}
-        <div className="archive-event-actions"><Link className="text-link" href={`/family/conversations/${conversation.id}`}>Open full conversation<ArrowRight size={15} /></Link><Link className="text-link" href={`/family/ask?date=${localDate(conversation.startedAt, timezone)}`}><Sparkles size={14} />Ask Hale about it</Link></div>
-      </div>
+      <section className="overview-section overview-feature" aria-labelledby="overview-conversations-title">
+        <div className="overview-section-heading">
+          <div><h2 id="overview-conversations-title">Recent conversations</h2><p>Transcripts and processing status</p></div>
+          <Link href="/family/conversations">View all<ArrowRight size={14} /></Link>
+        </div>
+        {recent.length ? <ul className="overview-conversation-list">
+          {recent.map((conversation) => {
+            const day = localDate(conversation.startedAt, space.timezone);
+            return <li key={conversation.id}><Link className="overview-conversation-row" href={`/family/conversations/${conversation.id}`}>
+              <span className="overview-conversation-date">{day === today ? "Today" : dateLabel(day, { weekday: "short", month: "short", day: "numeric" })}<small>{clockLabel(conversation.startedAt, space.timezone)} · {Math.max(1, Math.round(conversation.duration / 60))} min</small></span>
+              <span className="overview-conversation-copy"><strong>{conversation.title}</strong><small>{conversation.summary}</small></span>
+              <StatusPill state={conversation.state} />
+              <ChevronRight className="overview-row-chevron" size={17} />
+            </Link></li>;
+          })}
+        </ul> : <EmptyState title="No conversations yet" description="There are no recordings available in this family space."><Link className="text-link" href="/patient/today"><Mic size={15} />Open recording view</Link></EmptyState>}
+      </section>
     </div>
-  </article>;
-}
 
-function FamiliarPeople({ people, unknownTurns, timezone }: { people: Array<{ person: { id: string; name: string; relationship: string; initials: string; color: string }; personConversations: Conversation[]; latest?: Conversation }>; unknownTurns: number; timezone: string }) {
-  return <section className="archive-people"><div className="archive-section-header"><div><p className="archive-section-kicker">FAMILIAR PEOPLE</p><h2>In the record</h2></div><Users size={18} aria-hidden /></div>{people.length ? <ul className="archive-people-list">{people.map(({ person, personConversations, latest }) => <li key={person.id}><Link href="/family/people" className="archive-person-row"><span className={`archive-person-avatar avatar-${person.color}`}>{person.initials}</span><span className="archive-person-copy"><strong>{person.name}</strong><span>{person.relationship} · {personConversations.length} {personConversations.length === 1 ? "conversation" : "conversations"}</span><small>{latest ? `Last recorded ${clockLabel(latest.startedAt, timezone)}` : "No recent recording"}</small></span><ArrowRight size={15} /></Link></li>)}</ul> : <p className="archive-side-empty">No familiar voices are linked to the selected day. Speaker identities appear only when the record supports them.</p>}{unknownTurns > 0 && <p className="archive-unknown"><span className="archive-unknown-dot" />{unknownTurns} {unknownTurns === 1 ? "turn remains" : "turns remain"} unknown or unverified.</p>}<Link className="archive-side-link" href="/family/people">Manage people<ArrowRight size={14} /></Link></section>;
-}
-
-function ArchiveQuestions({ selectedDate }: { selectedDate: string }) {
-  return <section className="archive-ask-strip" aria-labelledby="archive-ask-title"><div><p className="archive-section-kicker">A QUESTION TO CARRY FORWARD</p><h2 id="archive-ask-title">Let Hale look a little closer.</h2><p>Ask from this day’s available records. Answers stay linked to their source.</p></div><div className="archive-question-links"><Link href={`/family/ask?date=${selectedDate}`}>What happened on this day?<ArrowRight size={14} /></Link><Link href={`/family/ask?date=${selectedDate}`}>Who did I speak with?<ArrowRight size={14} /></Link><Link href="/family/conversations">Find a conversation<ArrowRight size={14} /></Link></div></section>;
-}
-
-function ArchiveEmpty({ selectedDate, today }: { selectedDate: string; today: string }) {
-  const date = dateLabel(selectedDate, { weekday: "long", month: "long", day: "numeric" });
-  return <section className="archive-empty" aria-labelledby="archive-empty-title"><div className="archive-empty-mark" aria-hidden><span /><span /><span /><i /></div><div><p className="archive-section-kicker">NO RECORDED MOMENTS · {selectedDate === today ? "TODAY" : date.toUpperCase()}</p><h2 id="archive-empty-title">This page is waiting<br />for a moment.</h2><p>No conversations or saved memories are available for this date. That is a gap in the record, not a story about the day.</p><div className="archive-empty-actions"><Link className="btn btn-primary" href="/patient/today"><Mic size={16} />Start a consented recording</Link><Link className="archive-secondary-action" href={`/family/calendar?date=${selectedDate}`}>Explore the calendar<CalendarDays size={15} /></Link></div><p className="archive-empty-note"><ShieldCheck size={15} />After a conversation is processed, its source, participants, and any saved memories will appear here.</p></div></section>;
+  </>;
 }

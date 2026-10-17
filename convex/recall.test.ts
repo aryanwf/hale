@@ -107,7 +107,7 @@ describe("live, authorized source-bound recall and search", () => {
     const detail = await owner.query(app.api.conversations.detail, { conversationId });
     expect(detail.turns).toHaveLength(1);
     expect(detail.memories).toHaveLength(1);
-    expect(detail.audioUrl).toBeNull();
+    expect(detail).not.toHaveProperty("audioUrl");
     const answer = await owner.query(app.api.assistant.recall, { patientId, question: "Sunday?" });
     expect(JSON.stringify(answer)).not.toContain("secret words");
   });

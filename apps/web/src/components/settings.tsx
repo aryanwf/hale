@@ -1,11 +1,41 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Database, FlaskConical, LockKeyhole, RotateCcw, ShieldCheck, Smartphone } from "lucide-react";
+import { ChevronRight, Database, RotateCcw, ShieldCheck, Smartphone, Trash2 } from "lucide-react";
 import { useWorkspace } from "./providers";
-import { PageIntro } from "./ui";
 
-export function SettingsView({ patient = false }: { patient?: boolean }) {
-  const { mode, space, resetDemo } = useWorkspace();
-  return <><PageIntro eyebrow="YOUR SPACE, YOUR CHOICES" title={<>A little more <span className="heading-light">peace of mind.</span></>} description="Understand what is saved, who can see it, and what this first build can do." /><div className="settings-grid"><section className="settings-card"><div className="icon-label"><ShieldCheck size={21} /><h2>Access & privacy</h2></div><dl className="settings-rows"><div><dt>Patient space</dt><dd>{space.name}</dd></div><div><dt>Patient timezone</dt><dd>{space.timezone}</dd></div><div><dt>Permission checks</dt><dd>{mode === "demo" ? "Synthetic demo only" : "Server-side Convex membership"}</dd></div><div><dt>Sharing administration</dt><dd>Invitation UI not connected</dd></div></dl><p>No blanket family access. Patient-owned records require an active membership and the appropriate capability. Voice enrollment never authorizes an account.</p></section><section className="settings-card"><div className="icon-label"><Database size={21} /><h2>What stays, and for how long</h2></div><dl className="settings-rows"><div><dt>Raw conversation audio</dt><dd>Up to 7 days after upload</dd></div><div><dt>Transcripts & memories</dt><dd>Until you delete the conversation</dd></div><div><dt>Browser recording queue</dt><dd>In-memory only · up to 3 segments</dd></div><div><dt>Offline cache</dt><dd>Public fallback & icons only</dd></div></dl><p>Cloud processing is not end-to-end encrypted. Unsent audio can be lost when the page closes. Deleting evidence does not delete a provider’s independent records.</p></section><section className="settings-card"><div className="icon-label"><Smartphone size={21} /><h2>Hale on your iPhone</h2></div><ol className="install-steps"><li>Open the patient experience in Safari over HTTPS.</li><li>Tap Share, then Add to Home Screen.</li><li>Open Hale from its icon and sign in.</li><li>Keep Hale visible and your screen unlocked while recording.</li></ol><Link className="text-link" href="/patient/today">{patient ? "Return to Today" : "Open patient experience"}<ArrowUpRight size={15} /></Link><p>Home Screen installation doesn’t allow background microphone capture. Calls, screen lock, or another app may interrupt recording.</p></section><section className="settings-card"><div className="icon-label">{mode === "demo" ? <FlaskConical size={21} /> : <LockKeyhole size={21} />}<h2>{mode === "demo" ? "About this demo" : "Live connection"}</h2></div><p>{mode === "demo" ? "Every person and transcript is fictional. The fixed demo date is October 15, 2026. Recall is extractive and offline, not an AI integration. Demo changes reset on reload." : "Clerk authenticates your account. Convex is the only application database. Audio ingestion is connected; processing workers, model-backed recall, voice enrollment, and care-provider writes are not enabled yet."}</p><p>No automatic ride dispatch, no medical advice, and no clinical validation or HIPAA-compliance claim.</p>{resetDemo && <button className="btn btn-quiet" onClick={resetDemo}><RotateCcw size={15} />Reset demo memories</button>}</section></div></>;
+export function SettingsView() {
+  const { mode, resetDemo } = useWorkspace();
+
+  return <div className="settings-view">
+    <header className="settings-page-heading"><h1>Settings</h1><p className="settings-title-subtitle">Terms and Conditions</p></header>
+    <nav className="settings-options" aria-label="Settings topics">
+      <Link className="settings-option" href="/family/settings/family-access">
+        <span className="settings-option-icon"><ShieldCheck size={20} aria-hidden="true" /></span>
+        <div className="settings-option-copy"><h2>Your family access</h2><p>Who can see this space, how approval works, and what family access allows.</p></div>
+        <ChevronRight size={19} aria-hidden="true" />
+      </Link>
+      <Link className="settings-option" href="/family/settings/patient-phone">
+        <span className="settings-option-icon"><Smartphone size={20} aria-hidden="true" /></span>
+        <div className="settings-option-copy"><h2>Patient phone. Family dashboard.</h2><p>How the patient connects from Android and shares memories with family.</p></div>
+        <ChevronRight size={19} aria-hidden="true" />
+      </Link>
+      <Link className="settings-option" href="/family/settings/shared-data">
+        <span className="settings-option-icon"><Database size={20} aria-hidden="true" /></span>
+        <div className="settings-option-copy"><h2>What is shared</h2><p>What happens to conversation audio, transcripts, memories, and voice profiles.</p></div>
+        <ChevronRight size={19} aria-hidden="true" />
+      </Link>
+    </nav>
+
+    {mode === "demo" && <section className="settings-card settings-demo" aria-labelledby="demo-settings-title">
+      <div><h2 id="demo-settings-title">Demo workspace</h2><p>Demo memories are synthetic. No patient is connected and no real family code is generated.</p></div>
+      <button className="btn btn-quiet" onClick={resetDemo}><RotateCcw size={16} />Reset demo</button>
+    </section>}
+
+    {mode === "live" && <section className="settings-card account-danger">
+      <div className="icon-label"><Trash2 size={21} /><h2>Delete account</h2></div>
+      <p>Permanently delete your Hale data and sign-in account. Any patient spaces you own will also be deleted. You’ll review the consequences and confirm before anything is removed.</p>
+      <Link className="btn btn-primary" href="/account/delete">Delete account</Link>
+    </section>}
+  </div>;
 }

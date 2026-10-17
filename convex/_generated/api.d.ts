@@ -8,17 +8,23 @@
  * @module
  */
 
+import type * as accounts from "../accounts.js";
 import type * as assistant from "../assistant.js";
 import type * as authz from "../authz.js";
 import type * as conversations from "../conversations.js";
 import type * as crons from "../crons.js";
+import type * as families from "../families.js";
 import type * as http from "../http.js";
 import type * as lib_functions from "../lib/functions.js";
+import type * as lib_pyannote from "../lib/pyannote.js";
 import type * as lib_sarvam from "../lib/sarvam.js";
+import type * as lib_speakerMatching from "../lib/speakerMatching.js";
 import type * as patients from "../patients.js";
 import type * as people from "../people.js";
 import type * as privacy from "../privacy.js";
 import type * as recordings from "../recordings.js";
+import type * as reset from "../reset.js";
+import type * as speakerMatching from "../speakerMatching.js";
 import type * as transcriptions from "../transcriptions.js";
 import type * as voices from "../voices.js";
 
@@ -29,17 +35,23 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  accounts: typeof accounts;
   assistant: typeof assistant;
   authz: typeof authz;
   conversations: typeof conversations;
   crons: typeof crons;
+  families: typeof families;
   http: typeof http;
   "lib/functions": typeof lib_functions;
+  "lib/pyannote": typeof lib_pyannote;
   "lib/sarvam": typeof lib_sarvam;
+  "lib/speakerMatching": typeof lib_speakerMatching;
   patients: typeof patients;
   people: typeof people;
   privacy: typeof privacy;
   recordings: typeof recordings;
+  reset: typeof reset;
+  speakerMatching: typeof speakerMatching;
   transcriptions: typeof transcriptions;
   voices: typeof voices;
 }>;

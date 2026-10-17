@@ -65,6 +65,14 @@ describe("family account and voice enrollment boundaries", () => {
     expect(await t.run((ctx) => ctx.db.query("patients").collect())).toEqual([]);
     await expect(family.mutation(app.api.voices.saveProfile, { name: " ", relationship: "Friend" })).rejects.toThrow("name");
   });
+  test("a family profile can create its own space without gaining access to other spaces", async () => {
+    const { t, family } = await setup();
+    await t.withIdentity({ subject: "another-patient" }).mutation(app.api.patients.create, { name: "Another Patient", timezone: "UTC", recordingConsent: true });
+    await family.mutation(app.api.voices.skip);
+    const patientId = await family.mutation(app.api.patients.create, { name: "My Space", timezone: "UTC", recordingConsent: true });
+    const spaces = await family.query(app.api.patients.list);
+    expect(spaces.map((space) => space.id)).toEqual([patientId]);
+  });
   test("skipping needs no biometric consent and collects no voiceprint", async () => {
     const { t, family } = await setup();
     await family.mutation(app.api.voices.skip);
@@ -189,14 +197,24 @@ describe("pyannoteAI adapter (mocked HTTP, no live calls)", () => {
     await t.action(workers.internal.voices.start, { profileId, requestId });
     const profile = await t.run((ctx) => ctx.db.get(profileId));
     expect(profile?.voiceState).toBe("failed"); expect(profile?.message).not.toContain("private-provider");
+    expect(profile?.message).toContain("subscription or credits");
     expect(await t.run((ctx) => ctx.storage.getUrl(storageId))).toBeNull();
   });
-  test("provider warnings and exhausted polling do not become successful enrollment", async () => {
+  test("provider warnings do not block a valid voiceprint, while provider errors and exhausted polling fail safely", async () => {
     const { t, profileId, requestId } = await workerSetup();
     await t.run((ctx) => ctx.db.patch(profileId, { voiceState: "processing", jobId: "job-warning" }));
-    mockProvider(async () => Response.json({ jobId: "job-warning", status: "succeeded", output: { voiceprint: "untrusted", warning: "low quality" } }));
+    mockProvider(async () => Response.json({ jobId: "job-warning", status: "succeeded", output: { voiceprint: "valid-voiceprint", warning: "Non-blocking provider note." } }));
     await t.action(workers.internal.voices.poll, { profileId, requestId, attempt: 0 });
-    expect((await t.run((ctx) => ctx.db.get(profileId)))?.voiceState).toBe("failed");
+    const warnedProfile = await t.run((ctx) => ctx.db.get(profileId));
+    expect(warnedProfile?.voiceState).toBe("enrolled"); expect(warnedProfile?.voiceprint).toBe("valid-voiceprint");
+
+    await t.run((ctx) => ctx.db.patch(profileId, { voiceState: "processing", jobId: "job-error", voiceprint: undefined }));
+    mockProvider(async () => Response.json({ jobId: "job-error", status: "succeeded", output: { voiceprint: "must-not-store", error: "private provider details" } }));
+    await t.action(workers.internal.voices.poll, { profileId, requestId, attempt: 0 });
+    const erroredProfile = await t.run((ctx) => ctx.db.get(profileId));
+    expect(erroredProfile?.voiceState).toBe("failed"); expect(erroredProfile?.voiceprint).toBeUndefined();
+    expect(erroredProfile?.message).not.toContain("private provider details");
+
     await t.run((ctx) => ctx.db.patch(profileId, { voiceState: "processing", jobId: "job-slow" }));
     await t.action(workers.internal.voices.poll, { profileId, requestId, attempt: 60 });
     expect((await t.run((ctx) => ctx.db.get(profileId)))?.message).toContain("timed out");

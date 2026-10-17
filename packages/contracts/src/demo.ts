@@ -9,16 +9,16 @@ export const demoSpace: PatientSpace = {
   timezone: "America/New_York",
   capabilities: PATIENT_CAPABILITIES,
   people: [
-    { id: "margaret", name: "Margaret Okafor", initials: "MO", relationship: "You · patient", enrollment: "enrolled", color: "green" },
-    { id: "grace", name: "Grace Okafor", initials: "GO", relationship: "Sister", enrollment: "enrolled", color: "blue" },
-    { id: "daniel", name: "Daniel Okafor", initials: "DO", relationship: "Son", enrollment: "enrolled", color: "sand" },
+    { id: "margaret", name: "Margaret Okafor", initials: "MO", relationship: "You · patient", enrollment: "enrolled", voiceMatchingAvailable: false, color: "green" },
+    { id: "grace", name: "Grace Okafor", initials: "GO", relationship: "Sister", enrollment: "enrolled", voiceMatchingAvailable: false, color: "blue" },
+    { id: "daniel", name: "Daniel Okafor", initials: "DO", relationship: "Son", enrollment: "enrolled", voiceMatchingAvailable: false, color: "sand" },
   ],
   conversations: [
     {
       id: "garden-lunch", title: "Lunch, the garden & Sunday plans",
       summary: "Margaret and Grace talked about lunch at the garden café, the tomato harvest, and bringing a photo album on Sunday.",
       startedAt: "2026-10-15T16:15:00Z", duration: 864,
-      people: ["margaret", "grace"], state: "ready", audioAvailable: false, synthetic: true,
+      people: ["margaret", "grace"], state: "ready", synthetic: true,
       turns: [
         { id: "lunch-1", speaker: "Margaret", personId: "margaret", start: 0, end: 12, text: "It was lovely having lunch at the garden café today. I think that little table by the window is my favorite." },
         { id: "lunch-2", speaker: "Grace", personId: "grace", start: 14, end: 27, text: "Mine too. And the tomatoes you brought me look wonderful. Have you still got many in the garden?" },
@@ -33,7 +33,7 @@ export const demoSpace: PatientSpace = {
       id: "morning-call", title: "A morning catch-up with Daniel",
       summary: "Daniel mentioned a new book and a plan to visit on Saturday. Margaret shared that she had watered the garden.",
       startedAt: "2026-10-15T13:10:00Z", duration: 372,
-      people: ["margaret", "daniel"], state: "ready", audioAvailable: false, synthetic: true,
+      people: ["margaret", "daniel"], state: "ready", synthetic: true,
       turns: [
         { id: "call-1", speaker: "Daniel", personId: "daniel", start: 0, end: 15, text: "Good morning, Mum. I found that book about the coast we were talking about. I’ll bring it over on Saturday." },
         { id: "call-2", speaker: "Margaret", personId: "margaret", start: 18, end: 30, text: "That sounds lovely. I’ve just finished watering the garden. It’s such a beautiful morning." },
@@ -44,7 +44,7 @@ export const demoSpace: PatientSpace = {
       id: "wednesday-walk", title: "A walk by the water",
       summary: "Margaret told Grace about a walk by the lake and the ducks she saw. They discussed the weather.",
       startedAt: "2026-10-14T19:30:00Z", duration: 486,
-      people: ["margaret", "grace"], state: "ready", audioAvailable: false, synthetic: true,
+      people: ["margaret", "grace"], state: "ready", synthetic: true,
       turns: [
         { id: "walk-1", speaker: "Margaret", personId: "margaret", start: 0, end: 14, text: "I went for a walk by the lake this afternoon. The ducks were all gathered near the little bridge." },
         { id: "walk-2", speaker: "Grace", personId: "grace", start: 17, end: 26, text: "That sounds peaceful. Was it warm enough for you?" },
@@ -55,7 +55,7 @@ export const demoSpace: PatientSpace = {
       id: "tuesday-garden", title: "Tomatoes & old family recipes",
       summary: "Margaret and Grace talked about their mother’s tomato soup and a harvest from the garden.",
       startedAt: "2026-10-13T14:12:00Z", duration: 612,
-      people: ["margaret", "grace"], state: "ready", audioAvailable: false, synthetic: true,
+      people: ["margaret", "grace"], state: "ready", synthetic: true,
       turns: [
         { id: "garden-1", speaker: "Margaret", personId: "margaret", start: 0, end: 16, text: "I used to make tomato soup with Mum every autumn. She always added a little basil from the windowsill." },
         { id: "garden-2", speaker: "Grace", personId: "grace", start: 20, end: 31, text: "I remember. You told me you picked a whole basket of tomatoes this morning." },

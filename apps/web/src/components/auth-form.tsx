@@ -7,6 +7,7 @@ import { AuthShell } from "./auth-shell";
 import { appMode } from "@/lib/app-mode";
 
 const appearance = {
+  cssLayerName: "clerk",
   variables: {
     colorPrimary: "#9B2C2C",
     colorText: "#1A1A1A",
@@ -48,7 +49,7 @@ function LiveAuth({ signup }: { signup: boolean }) {
         <ShieldCheck size={28} />
         <h2>You’re signed in.</h2>
         <p className="muted">{nextStep}</p>
-        <Link className="btn btn-primary" href={signup ? destination : "/family/overview"}>
+        <Link className="btn btn-primary" href={destination}>
           {signup ? "Continue" : "Open my space"}
           <ArrowRight size={17} />
         </Link>

@@ -197,14 +197,24 @@ describe("pyannoteAI adapter (mocked HTTP, no live calls)", () => {
     await t.action(workers.internal.voices.start, { profileId, requestId });
     const profile = await t.run((ctx) => ctx.db.get(profileId));
     expect(profile?.voiceState).toBe("failed"); expect(profile?.message).not.toContain("private-provider");
+    expect(profile?.message).toContain("subscription or credits");
     expect(await t.run((ctx) => ctx.storage.getUrl(storageId))).toBeNull();
   });
-  test("provider warnings and exhausted polling do not become successful enrollment", async () => {
+  test("provider warnings do not block a valid voiceprint, while provider errors and exhausted polling fail safely", async () => {
     const { t, profileId, requestId } = await workerSetup();
     await t.run((ctx) => ctx.db.patch(profileId, { voiceState: "processing", jobId: "job-warning" }));
-    mockProvider(async () => Response.json({ jobId: "job-warning", status: "succeeded", output: { voiceprint: "untrusted", warning: "low quality" } }));
+    mockProvider(async () => Response.json({ jobId: "job-warning", status: "succeeded", output: { voiceprint: "valid-voiceprint", warning: "Non-blocking provider note." } }));
     await t.action(workers.internal.voices.poll, { profileId, requestId, attempt: 0 });
-    expect((await t.run((ctx) => ctx.db.get(profileId)))?.voiceState).toBe("failed");
+    const warnedProfile = await t.run((ctx) => ctx.db.get(profileId));
+    expect(warnedProfile?.voiceState).toBe("enrolled"); expect(warnedProfile?.voiceprint).toBe("valid-voiceprint");
+
+    await t.run((ctx) => ctx.db.patch(profileId, { voiceState: "processing", jobId: "job-error", voiceprint: undefined }));
+    mockProvider(async () => Response.json({ jobId: "job-error", status: "succeeded", output: { voiceprint: "must-not-store", error: "private provider details" } }));
+    await t.action(workers.internal.voices.poll, { profileId, requestId, attempt: 0 });
+    const erroredProfile = await t.run((ctx) => ctx.db.get(profileId));
+    expect(erroredProfile?.voiceState).toBe("failed"); expect(erroredProfile?.voiceprint).toBeUndefined();
+    expect(erroredProfile?.message).not.toContain("private provider details");
+
     await t.run((ctx) => ctx.db.patch(profileId, { voiceState: "processing", jobId: "job-slow" }));
     await t.action(workers.internal.voices.poll, { profileId, requestId, attempt: 60 });
     expect((await t.run((ctx) => ctx.db.get(profileId)))?.message).toContain("timed out");

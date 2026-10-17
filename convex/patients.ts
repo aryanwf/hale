@@ -35,7 +35,7 @@ export const create = mutation({
     const existing = await ctx.db.query("memberships").withIndex("by_subject", (q) => q.eq("subject", identity.subject)).collect();
     if (existing.some((item) => item.active && item.role === "patient")) throw new ConvexError("You already have a patient space.");
     const now = Date.now();
-    const patientId = await ctx.db.insert("patients", { name, timezone: args.timezone, createdBy: identity.subject, audioRetentionDays: 7, createdAt: now });
+    const patientId = await ctx.db.insert("patients", { name, timezone: args.timezone, createdBy: identity.subject, audioRetentionDays: 0, createdAt: now });
     await ctx.db.insert("memberships", { patientId, subject: identity.subject, role: "patient", capabilities: PATIENT_CAPABILITIES, active: true });
     await ctx.db.insert("people", { patientId, name, relationship: "You · patient", enrollment: "not_enrolled", isPatient: true });
     if (args.recordingConsent) await ctx.db.insert("consents", { patientId, subject: identity.subject, purpose: "recording", policyVersion: "2026-10-15-v1", grantedAt: now });

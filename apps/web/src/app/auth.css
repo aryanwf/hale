@@ -54,11 +54,13 @@
 .auth-footer { padding: 22px 28px; text-align: center; color: var(--muted); }
 .auth-footer > span { font-family: var(--font-mono); font-size: 8px; letter-spacing: .08em; }
 .auth-footer > p { font-size: 9px; margin-top: 5px; }
-.auth-steps { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--rule); padding-bottom: 21px; margin-bottom: 31px; }
-.auth-steps > li { display: flex; align-items: center; gap: 7px; font-size: 10px; color: var(--muted); white-space: nowrap; }
-.auth-steps > li > span { display: grid; place-items: center; height: 22px; width: 22px; border: 1px solid var(--rule-strong); border-radius: 50%; font-family: var(--font-mono); font-size: 8px; }
-.auth-steps .is-active { color: var(--accent); }
+.auth-steps { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--rule); padding-bottom: 21px; margin-bottom: 31px; }
+.auth-steps > li { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--ink); white-space: nowrap; }
+.auth-steps > li > span { display: grid; place-items: center; height: 24px; width: 24px; border: 1px solid var(--rule-strong); border-radius: 50%; background: #fff; color: var(--muted); font-family: var(--font-mono); font-size: 9px; }
+.auth-steps .is-active { color: var(--accent); font-weight: 550; }
 .auth-steps .is-active > span { background: var(--accent); border-color: var(--accent); color: white; }
+.auth-steps > li[aria-current="step"] { color: var(--accent); font-weight: 600; }
+.auth-steps > li[aria-current="step"] > span { box-shadow: 0 0 0 4px var(--blush); }
 .auth-signed-in { display: grid; gap: 17px; padding: 22px 0; }
 .auth-signed-in > svg { color: var(--accent); }
 .auth-signed-in h2 { font-size: 22px; font-weight: 500; letter-spacing: -.03em; }

@@ -12,6 +12,8 @@ const TTS_MAX_CHARACTERS = 2_500;
 const TRANSLATE_MAX_CHARACTERS = 2_000;
 const STT_MAX_KEYTERMS = 50;
 export const SARVAM_REALTIME_STT_MAX_SECONDS = 30;
+export const SARVAM_BATCH_STT_MAX_SECONDS = 2 * 60 * 60;
+const SARVAM_BATCH_FILE = "conversation.m4a";
 
 export type SarvamTranscript = {
   transcript: string;
@@ -39,6 +41,11 @@ export class SarvamApiError extends Error {
     this.status = status;
   }
 }
+
+export type SarvamBatchPollResult =
+  | { state: "pending" }
+  | { state: "failed" }
+  | { state: "completed"; transcript: SarvamTranscript };
 
 function apiKey(): string {
   const key = process.env.SARVAM_API_KEY;
@@ -140,6 +147,149 @@ export async function transcribeAudio(
     if (error instanceof SarvamApiError) throw error;
     throw new SarvamApiError("speech-to-text");
   }
+}
+
+/** Start Sarvam's asynchronous batch API for clips longer than the REST limit. */
+export async function startBatchTranscription(audio: Blob): Promise<string> {
+  if (!(audio instanceof Blob) || audio.size === 0) throw new Error("Audio is required for transcription.");
+  const mimeType = audio.type.split(";")[0]?.trim().toLowerCase() || "audio/mp4";
+  const filename = batchFilename(mimeType);
+  const initialized = await batchJson("batch job creation", "/speech-to-text/job/v1", "POST", {
+    job_parameters: { model: STT_MODEL, mode: "transcribe", with_timestamps: true },
+  });
+  const jobId = stringField(initialized, "job_id");
+  if (!jobId) throw new SarvamApiError("batch job creation");
+
+  const uploadLinks = await batchJson("batch upload link", "/speech-to-text/job/v1/upload-files", "POST", {
+    job_id: jobId,
+    files: [filename],
+  });
+  const urls = objectField(uploadLinks, "upload_urls");
+  const fileDetails = objectField(urls, filename);
+  const uploadUrl = stringField(fileDetails, "file_url");
+  if (!uploadUrl || !safeProviderUrl(uploadUrl)) throw new SarvamApiError("batch upload link");
+
+  const uploadResponse = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: { "x-ms-blob-type": "BlockBlob", "Content-Type": mimeType },
+    body: audio,
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!uploadResponse.ok) throw new SarvamApiError("batch audio upload", uploadResponse.status);
+
+  const started = await batchJson("batch job start", `/speech-to-text/job/v1/${encodeURIComponent(jobId)}/start`, "POST");
+  if (stringField(started, "job_id") !== jobId) throw new SarvamApiError("batch job start");
+  return jobId;
+}
+
+/** Check a batch transcription and download the result only after completion. */
+export async function pollBatchTranscription(jobId: string): Promise<SarvamBatchPollResult> {
+  if (!jobId || jobId.length > 200) throw new SarvamApiError("batch job status");
+  const status = await batchJson("batch job status", `/speech-to-text/job/v1/${encodeURIComponent(jobId)}/status`, "GET");
+  if (stringField(status, "job_id") !== jobId) throw new SarvamApiError("batch job status");
+  const jobState = stringField(status, "job_state")?.toLowerCase();
+  if (jobState === "failed") return { state: "failed" };
+  if (jobState !== "completed" && jobState !== "partiallycompleted") return { state: "pending" };
+
+  const details = status.job_details;
+  if (!Array.isArray(details) || details.length > 20) throw new SarvamApiError("batch job status");
+  let outputFilename: string | undefined;
+  for (const detail of details) {
+    const entry = asRecord(detail);
+    const outputs = entry?.outputs;
+    if (entry?.state === "Success" && Array.isArray(outputs) && outputs.length) {
+      outputFilename = stringField(asRecord(outputs[0]), "file_name");
+      if (outputFilename) break;
+    }
+  }
+  if (!outputFilename) return { state: "failed" };
+
+  const downloadLinks = await batchJson("batch result link", "/speech-to-text/job/v1/download-files", "POST", {
+    job_id: jobId,
+    files: [outputFilename],
+  });
+  const downloads = objectField(downloadLinks, "download_urls");
+  const outputDetails = objectField(downloads, outputFilename);
+  const downloadUrl = stringField(outputDetails, "file_url");
+  if (!downloadUrl || !safeProviderUrl(downloadUrl)) throw new SarvamApiError("batch result link");
+  const response = await fetch(downloadUrl, { signal: AbortSignal.timeout(30_000) });
+  if (!response.ok) throw new SarvamApiError("batch result download", response.status);
+  const text = await response.text();
+  if (text.length > 1_000_000) throw new SarvamApiError("batch result download");
+  let result: unknown;
+  try { result = JSON.parse(text); }
+  catch { throw new SarvamApiError("batch result download"); }
+  const transcript = parseBatchTranscript(result);
+  return transcript ? { state: "completed", transcript } : { state: "failed" };
+}
+
+async function batchJson(operation: string, path: string, method: "GET" | "POST", body?: unknown): Promise<Record<string, unknown>> {
+  const response = await fetch(`${API_ORIGIN}${path}`, {
+    method,
+    headers: { "api-subscription-key": apiKey(), ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!response.ok) throw new SarvamApiError(operation, response.status);
+  try {
+    const value: unknown = await response.json();
+    const object = asRecord(value);
+    if (!object) throw new SarvamApiError(operation);
+    return object;
+  } catch (error) {
+    if (error instanceof SarvamApiError) throw error;
+    throw new SarvamApiError(operation);
+  }
+}
+
+function parseBatchTranscript(value: unknown): SarvamTranscript | null {
+  const result = asRecord(value);
+  if (!result || typeof result.transcript !== "string") return null;
+  const timestamps = asRecord(result.timestamps);
+  const chunks = timestamps?.chunks;
+  const starts = timestamps?.start_time_seconds;
+  const ends = timestamps?.end_time_seconds;
+  const validTimestamps = Array.isArray(chunks) && chunks.every((item) => typeof item === "string")
+    && Array.isArray(starts) && starts.every((item) => typeof item === "number" && Number.isFinite(item))
+    && Array.isArray(ends) && ends.every((item) => typeof item === "number" && Number.isFinite(item))
+    && chunks.length === starts.length && chunks.length === ends.length;
+  return {
+    transcript: result.transcript,
+    languageCode: typeof result.language_code === "string" ? result.language_code : null,
+    languageProbability: null,
+    requestId: typeof result.request_id === "string" ? result.request_id : null,
+    ...(validTimestamps ? { timestamps: { segments: chunks as string[], startTimeSeconds: starts as number[], endTimeSeconds: ends as number[] } } : {}),
+  };
+}
+
+function batchFilename(mimeType: string): string {
+  const extension = mimeType === "audio/wav" || mimeType === "audio/x-wav" ? "wav"
+    : mimeType === "audio/mpeg" ? "mp3"
+      : mimeType === "audio/aac" ? "aac"
+        : mimeType === "audio/ogg" ? "ogg"
+          : mimeType === "audio/flac" ? "flac"
+            : "m4a";
+  return SARVAM_BATCH_FILE.replace(/\.m4a$/, `.${extension}`);
+}
+
+function safeProviderUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
+  } catch { return false; }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function objectField(value: Record<string, unknown> | null | undefined, key: string): Record<string, unknown> | null {
+  return asRecord(value?.[key]);
+}
+
+function stringField(value: Record<string, unknown> | null | undefined, key: string): string | undefined {
+  const field = value?.[key];
+  return typeof field === "string" ? field : undefined;
 }
 
 export async function completeChat(messages: SarvamChatMessage[], options: { maxTokens?: number; temperature?: number } = {}): Promise<string> {

@@ -23,6 +23,7 @@ import type * as patients from "../patients.js";
 import type * as people from "../people.js";
 import type * as privacy from "../privacy.js";
 import type * as recordings from "../recordings.js";
+import type * as reset from "../reset.js";
 import type * as speakerMatching from "../speakerMatching.js";
 import type * as transcriptions from "../transcriptions.js";
 import type * as voices from "../voices.js";
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   people: typeof people;
   privacy: typeof privacy;
   recordings: typeof recordings;
+  reset: typeof reset;
   speakerMatching: typeof speakerMatching;
   transcriptions: typeof transcriptions;
   voices: typeof voices;

@@ -26,6 +26,7 @@
     "dev:mobile:usb": "bun run --cwd apps/mobile dev:usb",
     "mobile:android": "bun run --cwd apps/mobile android",
     "mobile:apk": "bun run --cwd apps/mobile build:apk",
+    "reset:demo": "bun scripts/reset-demo.ts",
     "build": "bun run --cwd apps/web build",
     "lint": "bun run --cwd apps/web lint",
     "typecheck": "bun run --cwd apps/web typecheck && bun run --cwd apps/mobile typecheck && tsc --noEmit -p convex/tsconfig.json",

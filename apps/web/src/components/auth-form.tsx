@@ -76,16 +76,11 @@ export function AuthPage({ signup = false }: { signup?: boolean }) {
         <h1>
           {signup ? <>Create a family<br /><span>account.</span></> : <>Welcome back.<br /><span>Sign in to continue.</span></>}
         </h1>
-        {!signup && <p>Log in to see the conversations and little moments your loved one shares with you.</p>}
       </div>
       {signup && <p className="auth-account-type">For family members · patients use the Hale Android app</p>}
       {!live && <AuthUnavailable />}
       {live && signup && <LiveAuth signup />}
       {live && !signup && <LoginPanel />}
-      {!signup && <p className="auth-privacy">
-        <ShieldCheck size={15} />
-        <span>Your memories stay in your circle. Access is always permission-based.</span>
-      </p>}
     </AuthShell>
   );
 }

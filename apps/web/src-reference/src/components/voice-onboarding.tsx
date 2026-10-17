@@ -50,7 +50,7 @@ function VoiceFlow({ demo = false, configured, profile, onIntroduce, onUpload, o
   };
   const discard = () => { recorder.reset(); setOnlyMe(false); };
 
-  return <AuthShell signup step={done ? 2 : 1}>
+  return <AuthShell signup step={2}>
     {done ? <div className="voice-complete">
       <span className="voice-complete-icon"><CheckCircle2 size={31} strokeWidth={1.5} /></span>
       <p className="eyebrow">VOICE PROFILE</p>

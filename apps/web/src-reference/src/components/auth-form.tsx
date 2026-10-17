@@ -67,9 +67,7 @@ function AuthUnavailable() {
 
 export function AuthPage({ signup = false }: { signup?: boolean }) {
   const live = appMode === "live";
-  const introDescription = !signup
-    ? "Log in to see the conversations and little moments your loved one shares with you."
-    : "Create your family account. Get a private family code for your loved one to enter in the Hale Android app.";
+  const introDescription = "Create your family account. Get a private family code for your loved one to enter in the Hale Android app.";
 
   return (
     <AuthShell signup={signup}>
@@ -78,16 +76,16 @@ export function AuthPage({ signup = false }: { signup?: boolean }) {
         <h1>
           {signup ? <>Create a family<br /><span>account.</span></> : <>Welcome back.<br /><span>Sign in to continue.</span></>}
         </h1>
-        <p>{introDescription}</p>
+        {signup && <p>{introDescription}</p>}
       </div>
       {signup && <p className="auth-account-type">For family members · patients use the Hale Android app</p>}
       {!live && <AuthUnavailable />}
       {live && signup && <LiveAuth signup />}
       {live && !signup && <LoginPanel />}
-      <p className="auth-privacy">
+      {signup && <p className="auth-privacy">
         <ShieldCheck size={15} />
-        <span>{signup ? "Joining doesn’t grant access to anyone’s memories. Patient-space permission is always required." : "Your memories stay in your circle. Access is always permission-based."}</span>
-      </p>
+        <span>Joining doesn’t grant access to anyone’s memories. Patient-space permission is always required.</span>
+      </p>}
     </AuthShell>
   );
 }

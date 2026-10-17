@@ -114,6 +114,33 @@ export default defineSchema({
     turnIds: v.array(v.id("transcriptTurns")), people: v.array(v.id("people")),
   }).index("by_patient_date", ["patientId", "localDate"]).index("by_conversation", ["conversationId"])
     .searchIndex("search_text", { searchField: "text", filterFields: ["patientId"] }),
+  familySummaries: defineTable({
+    patientId: v.id("patients"),
+    kind: v.union(v.literal("nightly"), v.literal("weekly")),
+    periodKey: v.string(), periodStart: v.string(), periodEnd: v.string(),
+    // Keep only source IDs, never copied transcript text, so source deletion stays effective.
+    sourceTurnIds: v.array(v.id("transcriptTurns")),
+    generatedAt: v.number(), afterSummaryId: v.optional(v.id("familySummaries")),
+  }).index("by_patient_kind_period", ["patientId", "kind", "periodKey"])
+    .index("by_patient_generatedAt", ["patientId", "generatedAt"])
+    .index("by_patient", ["patientId"]),
+  familySummaryPreferences: defineTable({
+    patientId: v.id("patients"), subject: v.string(),
+    nightly: v.boolean(), weekly: v.boolean(), email: v.optional(v.string()),
+    updatedAt: v.number(), testEmailSentAt: v.optional(v.number()),
+  }).index("by_patient_subject", ["patientId", "subject"])
+    .index("by_subject", ["subject"]).index("by_patient", ["patientId"]),
+  familySummaryDeliveries: defineTable({
+    patientId: v.id("patients"), summaryId: v.id("familySummaries"), recipientSubject: v.string(),
+    status: v.union(v.literal("queued"), v.literal("sending"), v.literal("sent"), v.literal("failed"), v.literal("skipped")),
+    attempts: v.number(), nextAttemptAt: v.number(), createdAt: v.number(),
+    claimedAt: v.optional(v.number()), deliveredAt: v.optional(v.number()),
+    lastError: v.optional(v.string()), skippedReason: v.optional(v.string()),
+  }).index("by_summary_recipient", ["summaryId", "recipientSubject"])
+    .index("by_summary", ["summaryId"]).index("by_recipient_subject", ["recipientSubject"])
+    .index("by_patient", ["patientId"])
+    .index("by_status_nextAttempt", ["status", "nextAttemptAt"])
+    .index("by_status_claimedAt", ["status", "claimedAt"]),
   auditEvents: defineTable({
     patientId: v.id("patients"), actor: v.string(), operation: v.string(),
     target: v.string(), timestamp: v.number(),

@@ -18,7 +18,7 @@ export async function loadSpace(ctx: QueryCtx, patientId: GenericId<"patients">,
     let budget = 500;
     const records: PatientSpace["conversations"] = [];
     for (const conversation of visible) {
-      const record = conversationRecord(conversation);
+      const record = await conversationRecord(ctx, conversation);
       if (options.includeTurns && (conversation.state === "ready" || conversation.state === "processing")) {
         if (budget === 0) limited = true;
         else {
@@ -67,8 +67,24 @@ async function canMatchPerson(ctx: QueryCtx, patientId: GenericId<"patients">, p
   return Boolean(membership?.active && correctRole && profile?.subject === subject && profile.voiceState === "enrolled" && profile.voiceprint && profile.voiceprint.length <= 20_000 && (!person.familyProfileId || person.familyProfileId === profile._id) && consents.some((consent) => !consent.revokedAt && consent.policyVersion === VOICE_MATCHING_POLICY));
 }
 
-function conversationRecord(conversation: DataModel["conversations"]["document"]): PatientSpace["conversations"][number] {
-  return { id: conversation._id, title: conversation.title, summary: conversation.summary, startedAt: new Date(conversation.startedAt).toISOString(), duration: conversation.duration, people: conversation.people, state: conversation.state, turns: [], synthetic: false };
+async function conversationRecord(ctx: QueryCtx, conversation: DataModel["conversations"]["document"]): Promise<PatientSpace["conversations"][number]> {
+  const chunk = await ctx.db.get(conversation.chunkId);
+  const hasCurrentChunk = chunk?.patientId === conversation.patientId && !chunk.deletedAt;
+  const recordingSessionId = conversation.sessionId ?? (hasCurrentChunk ? chunk.sessionId : undefined);
+  const sequence = !conversation.sessionId && hasCurrentChunk ? chunk.sequence : undefined;
+  return {
+    id: conversation._id,
+    title: conversation.title,
+    summary: conversation.summary,
+    startedAt: new Date(conversation.startedAt).toISOString(),
+    duration: conversation.duration,
+    people: conversation.people,
+    state: conversation.state,
+    turns: [],
+    synthetic: false,
+    ...(recordingSessionId ? { recordingSessionId } : {}),
+    ...(sequence !== undefined ? { sequence } : {}),
+  };
 }
 
 export const space = query({
@@ -96,7 +112,7 @@ export const search = query({
       }
     }
     const visible = [...matches.values()].filter((item) => !item.deletedAt && (!day || item.localDate === day) && (!personId || item.people.some((id) => id === personId))).sort((a, b) => b.startedAt - a.startedAt);
-    return { conversations: visible.slice(0, 100).map(conversationRecord), limited: limited || visible.length > 100 };
+    return { conversations: await Promise.all(visible.slice(0, 100).map((item) => conversationRecord(ctx, item))), limited: limited || visible.length > 100 };
   },
 });
 
@@ -110,7 +126,7 @@ export const detail = query({
     const memories = await ctx.db.query("memories").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).take(100);
     return {
       patientId: conversation.patientId,
-      conversation: conversationRecord(conversation),
+      conversation: await conversationRecord(ctx, conversation),
       memories: memories.filter((memory) => memory.patientId === conversation.patientId).map((memory) => ({ id: memory._id, kind: memory.kind, title: memory.title, text: memory.text, localDate: memory.localDate, plannedFor: memory.plannedFor, occurredAt: memory.occurredAt, conversationId: memory.conversationId, turnIds: memory.turnIds, people: memory.people })),
       turns: turns.filter((turn) => turn.patientId === conversation.patientId).map((turn) => ({ id: turn._id, speaker: turn.speaker, personId: turn.personId, start: turn.start, end: turn.end, text: turn.text, uncertain: turn.uncertain })),
     };

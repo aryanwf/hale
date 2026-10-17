@@ -37,6 +37,8 @@ async function eraseAccountData(ctx: MutationCtx, subject: string) {
   remove(await ctx.db.query("auditEvents").withIndex("by_actor", (q) => q.eq("actor", subject)).take(READ_LIMIT));
   remove(await ctx.db.query("patientInvitations").withIndex("by_createdBy", (q) => q.eq("createdBy", subject)).take(READ_LIMIT));
   remove(await ctx.db.query("patientInvitations").withIndex("by_acceptedBy", (q) => q.eq("acceptedBy", subject)).take(READ_LIMIT));
+  remove(await ctx.db.query("familySummaryPreferences").withIndex("by_subject", (q) => q.eq("subject", subject)).take(READ_LIMIT));
+  remove(await ctx.db.query("familySummaryDeliveries").withIndex("by_recipient_subject", (q) => q.eq("recipientSubject", subject)).take(READ_LIMIT));
 
   const linkedPeople = new Map<string, Doc<"people">>();
   const people = await ctx.db.query("people").withIndex("by_linkedSubject", (q) => q.eq("linkedSubject", subject)).take(READ_LIMIT);
@@ -66,6 +68,9 @@ async function eraseAccountData(ctx: MutationCtx, subject: string) {
     remove(await ctx.db.query("conversations").withIndex("by_patient_date", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
     remove(await ctx.db.query("transcriptTurns").withIndex("by_patientId", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
     remove(await ctx.db.query("memories").withIndex("by_patient_date", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
+    remove(await ctx.db.query("familySummaries").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
+    remove(await ctx.db.query("familySummaryPreferences").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
+    remove(await ctx.db.query("familySummaryDeliveries").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
     remove(await ctx.db.query("auditEvents").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(READ_LIMIT));
   }
 

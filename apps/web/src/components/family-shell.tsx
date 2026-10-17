@@ -10,7 +10,7 @@ import { PatientSwitcher } from "./patient-switcher";
 import { api } from "@/lib/api";
 
 const navigation = [
-  ["Overview", "/family/overview"], ["Calendar", "/family/calendar"],
+  ["Overview", "/family/overview"], ["Summaries", "/family/summaries"], ["Calendar", "/family/calendar"],
   ["Conversations", "/family/conversations"], ["Care & Tasks", "/family/care"],
   ["People", "/family/people"], ["Ask Hale", "/family/ask"], ["Connect family", "/family/connect"], ["Settings", "/family/settings"], ["Privacy", "/privacy"],
 ];

@@ -1,17 +1,27 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { defineTestApp } from "convex-test";
+import { VOICE_MATCHING_POLICY } from "@hale/contracts/voice";
 import schema from "./schema";
 import * as patients from "./patients";
 import * as recordings from "./recordings";
 import * as transcriptions from "./transcriptions";
+import * as speakerMatching from "./speakerMatching";
 import * as conversations from "./conversations";
 import * as privacy from "./privacy";
 import * as assistant from "./assistant";
 import * as care from "./care";
 import * as eventDetection from "./eventDetection";
 
-const app = defineTestApp({ schema }).defineModules({ patients, recordings, transcriptions, conversations, privacy, assistant, care, eventDetection });
+const app = defineTestApp({ schema }).defineModules({ patients, recordings, transcriptions, speakerMatching, conversations, privacy, assistant, care, eventDetection });
 const tests: ReturnType<typeof app.createTest>[] = [];
+const originalFetch = globalThis.fetch;
+let previousPyannoteKey: string | undefined;
+
+beforeEach(() => {
+  previousPyannoteKey = process.env.PYANNOTE_API_KEY;
+  delete process.env.PYANNOTE_API_KEY;
+  globalThis.fetch = originalFetch;
+});
 
 afterEach(async () => {
   for (const t of tests.splice(0)) {
@@ -22,19 +32,35 @@ afterEach(async () => {
     });
     await t.finishInProgressScheduledFunctions();
   }
+  globalThis.fetch = originalFetch;
+  if (previousPyannoteKey === undefined) delete process.env.PYANNOTE_API_KEY;
+  else process.env.PYANNOTE_API_KEY = previousPyannoteKey;
 });
 
-async function setup() {
+async function setup(options: { matching?: boolean } = {}) {
   const t = app.createTest();
   tests.push(t);
   const owner = t.withIdentity({ subject: "continuous-owner" });
   const patientId = await owner.mutation(app.api.patients.create, { name: "Synthetic Test", timezone: "UTC", recordingConsent: true, externalAIConsent: true });
-  const sessionId = await owner.mutation(app.api.recordings.start, { patientId, participantsConsented: true, captureMode: "native", continuous: true });
+  const personId = options.matching ? await t.run(async (ctx) => {
+    const person = (await ctx.db.query("people").withIndex("by_patient", (q) => q.eq("patientId", patientId)).first())!;
+    const now = Date.now();
+    const profileId = await ctx.db.insert("familyProfiles", {
+      subject: "continuous-owner", name: "Synthetic Patient", relationship: "Self", voiceState: "enrolled",
+      consentAt: now, policyVersion: "test-policy", voiceprint: "synthetic-voiceprint", enrollmentVersion: 1, updatedAt: now,
+    });
+    await ctx.db.patch(person._id, { familyProfileId: profileId, voiceConsentAt: now, voiceConsentPolicy: VOICE_MATCHING_POLICY });
+    await ctx.db.insert("consents", { patientId, subject: "continuous-owner", purpose: "voice_matching", policyVersion: VOICE_MATCHING_POLICY, grantedAt: now });
+    return person._id;
+  }) : null;
+  const expectedPeople = personId ? [personId] : [];
+  const sessionId = await owner.mutation(app.api.recordings.start, { patientId, participantsConsented: true, captureMode: "native", continuous: true, expectedPeople });
   const capturedAt = Date.now() - 1000;
   await t.run((ctx) => ctx.db.patch(sessionId, { startedAt: capturedAt }));
-  async function upload(sequence: number) {
+  async function upload(sequence: number, durationMs = 1000) {
     const storageId = await t.run((ctx) => ctx.storage.store(new Blob(["synthetic audio"], { type: "audio/wav" })));
-    const args = { sessionId, sequence, capturedAt: capturedAt + sequence * 1000, endedAt: capturedAt + sequence * 1000 + 1000, storageId, mimeType: "audio/wav" };
+    const chunkStart = capturedAt + sequence * durationMs;
+    const args = { sessionId, sequence, capturedAt: chunkStart, endedAt: chunkStart + durationMs, storageId, mimeType: "audio/wav" };
     const result = await owner.mutation(app.internal.recordings.acceptChunk, args);
     const job = await t.run((ctx) => ctx.db.query("processingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", result.chunkId)).unique());
     await t.run(async (ctx) => {
@@ -44,12 +70,12 @@ async function setup() {
     });
     return { ...result, jobId: job!._id, args, storageId };
   }
-  async function finish(jobId: (Awaited<ReturnType<typeof upload>>)["jobId"], text: string) {
+  async function finish(jobId: (Awaited<ReturnType<typeof upload>>)["jobId"], text: string, durationSeconds = 1) {
     const claimed = await t.mutation(app.internal.transcriptions.claim, { jobId });
     if (!claimed) throw new Error("The test transcription job should still be queued for manual completion.");
-    return t.mutation(app.internal.transcriptions.complete, { jobId, generation: claimed.generation, turns: text ? [{ start: 0, end: 0.5, text }] : [] });
+    return t.mutation(app.internal.transcriptions.complete, { jobId, generation: claimed.generation, turns: text ? [{ start: 0, end: durationSeconds, text }] : [] });
   }
-  return { t, owner, patientId, sessionId, upload, finish };
+  return { t, owner, patientId, personId, sessionId, upload, finish };
 }
 
 describe("continuous conversation recording", () => {
@@ -78,10 +104,12 @@ describe("continuous conversation recording", () => {
   test("switching off waits for outstanding transcription before marking ready", async () => {
     const { t, owner, sessionId, upload, finish } = await setup();
     const clip = await upload(0);
+    const claimed = await t.mutation(app.internal.transcriptions.claim, { jobId: clip.jobId });
+    expect(claimed).not.toBeNull();
     await owner.mutation(app.api.recordings.setState, { sessionId, state: "stopped" });
     const live = await owner.query(app.api.recordings.live, { sessionId });
     expect(await t.run((ctx) => ctx.db.get(live!.conversationId!))).toMatchObject({ state: "processing", pendingChunks: 1 });
-    await finish(clip.jobId, "Last words.");
+    await t.mutation(app.internal.transcriptions.complete, { jobId: clip.jobId, generation: claimed!.generation, turns: [{ start: 0, end: 1, text: "Last words." }] });
     expect(await t.run((ctx) => ctx.db.get(live!.conversationId!))).toMatchObject({ state: "ready", pendingChunks: 0 });
   });
 
@@ -106,6 +134,68 @@ describe("continuous conversation recording", () => {
     const { t, upload, finish } = await setup();
     const clip = await upload(0);
     await finish(clip.jobId, "Saved words.");
+    expect(await t.run((ctx) => ctx.storage.get(clip.storageId))).toBeNull();
+  });
+
+  test("selected, consented live speakers are matched per segment and transcript offsets stay local", async () => {
+    const { t, owner, personId, sessionId, upload, finish } = await setup({ matching: true });
+    const first = await upload(0, 4_000);
+    const second = await upload(1, 4_000);
+    await owner.mutation(app.api.recordings.setState, { sessionId, state: "stopped" });
+    await finish(first.jobId, "First selected-speaker turn.", 4);
+    await finish(second.jobId, "Second selected-speaker turn.", 4);
+
+    const firstSpeakerJob = await t.run(async (ctx) => (await ctx.db.query("speakerMatchingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", first.chunkId)).unique())!);
+    const secondSpeakerJob = await t.run(async (ctx) => (await ctx.db.query("speakerMatchingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", second.chunkId)).unique())!);
+    expect(firstSpeakerJob.state).toBe("queued");
+    expect(secondSpeakerJob.state).toBe("queued");
+    expect(await t.run((ctx) => ctx.storage.getUrl(first.storageId))).not.toBeNull();
+
+    process.env.PYANNOTE_API_KEY = "test-key-not-real";
+    let label = "";
+    let jobNumber = 0;
+    globalThis.fetch = Object.assign(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/identify")) {
+        const request = JSON.parse(String(init?.body)) as { voiceprints: { label: string }[] };
+        label = request.voiceprints[0]!.label;
+        jobNumber++;
+        return Response.json({ jobId: `live-identify-${jobNumber}`, status: "created" });
+      }
+      const jobId = new URL(url).pathname.split("/").at(-1)!;
+      return Response.json({ jobId, status: "succeeded", output: {
+        diarization: [{ speaker: "SPEAKER_00", start: 0, end: 4 }],
+        voiceprints: [{ speaker: "SPEAKER_00", match: label, confidence: { [label]: 92 } }],
+      } });
+    }, { preconnect: originalFetch.preconnect });
+
+    for (const speakerJob of [firstSpeakerJob, secondSpeakerJob]) {
+      await t.action(app.internal.speakerMatching.process, { jobId: speakerJob._id });
+      await t.action(app.internal.speakerMatching.poll, { jobId: speakerJob._id, generation: 1, attempt: 0 });
+    }
+
+    const live = await owner.query(app.api.recordings.live, { sessionId });
+    expect(live?.pending).toBe(0);
+    expect(personId).not.toBeNull();
+    const turns = await t.run((ctx) => ctx.db.query("transcriptTurns").withIndex("by_conversation", (q) => q.eq("conversationId", live!.conversationId!)).take(10));
+    expect(turns.map(({ speaker, personId: assigned, uncertain, start }) => ({ speaker, personId: assigned, uncertain, start }))).toEqual([
+      { speaker: "Synthetic Test", personId: personId!, uncertain: false, start: 0 },
+      { speaker: "Synthetic Test", personId: personId!, uncertain: false, start: 4 },
+    ]);
+    const conversation = await t.run((ctx) => ctx.db.get(live!.conversationId!));
+    expect(conversation).toMatchObject({ state: "ready", people: [personId], pendingChunks: 0 });
+    expect(await t.run((ctx) => ctx.storage.getUrl(first.storageId))).toBeNull();
+    expect(await t.run((ctx) => ctx.storage.getUrl(second.storageId))).toBeNull();
+  });
+
+  test("silent selected-speaker segments skip pyannote and release their pending slot", async () => {
+    const { t, owner, sessionId, upload, finish } = await setup({ matching: true });
+    const clip = await upload(0, 4_000);
+    await finish(clip.jobId, "", 4);
+    const job = await t.run(async (ctx) => (await ctx.db.query("speakerMatchingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", clip.chunkId)).unique())!);
+    const live = await owner.query(app.api.recordings.live, { sessionId });
+    expect(job.state).toBe("skipped");
+    expect(live).toMatchObject({ pending: 0, failed: 0, turns: [] });
     expect(await t.run((ctx) => ctx.storage.get(clip.storageId))).toBeNull();
   });
 

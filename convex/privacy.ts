@@ -632,7 +632,8 @@ export const expireAudio = internalMutation({
           state: "failed", providerJobId: undefined, generation: speakerJob.generation + 1,
           error: "Temporary audio expired before speaker matching completed.", updatedAt: now,
         });
-        if (conversation && !conversation.deletedAt) {
+        if (conversation?.sessionId && !conversation.deletedAt) await settleLiveChunk(ctx, conversation, "ready");
+        else if (conversation && !conversation.deletedAt) {
           await ctx.db.patch(conversation._id, {
             state: "ready", people: [],
             summary: "Transcript prepared. Temporary audio expired before speaker matching completed, so every voice remains unknown.",

@@ -14,6 +14,7 @@ import { appMode } from "@/lib/app-mode";
 
 interface FlowProps {
   demo?: boolean;
+  patientAccount?: boolean;
   configured: boolean;
   profile?: FamilyProfile | null;
   onIntroduce?: (name: string, relationship: string) => Promise<unknown>;
@@ -21,14 +22,14 @@ interface FlowProps {
   onRevoke?: () => Promise<unknown>;
 }
 
-function VoiceFlow({ demo = false, configured, profile, onIntroduce, onUpload, onRevoke }: FlowProps) {
+function VoiceFlow({ demo = false, patientAccount = false, configured, profile, onIntroduce, onUpload, onRevoke }: FlowProps) {
   const hydrated = useHydrated();
   const [recorder] = useState(() => new VoiceRecorder());
   const capture = useSyncExternalStore(recorder.subscribe, recorder.getSnapshot, recorder.getSnapshot);
   useEffect(() => recorder.attach(), [recorder]);
   const [introduced, setIntroduced] = useState(false);
   const [name, setName] = useState(profile?.name ?? (demo ? "Daniel Okafor" : ""));
-  const [relationship, setRelationship] = useState(profile?.relationship ?? "");
+  const [relationship, setRelationship] = useState(profile?.relationship ?? (patientAccount ? "You · patient" : ""));
   const [consent, setConsent] = useState(false);
   const [onlyMe, setOnlyMe] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -40,6 +41,10 @@ function VoiceFlow({ demo = false, configured, profile, onIntroduce, onUpload, o
   const done = Boolean(demoDone || (!reopen && profile?.voiceState === "enrolled"));
   const recording = capture.phase === "recording";
   const capturing = ["starting", "recording", "converting"].includes(capture.phase);
+  const dashboardHref = patientAccount ? "/patient/today" : "/family/overview";
+  const relationships = patientAccount
+    ? ["You · patient", "Son", "Daughter", "Partner", "Parent", "Sibling", "Friend", "Other family member", "Trusted supporter"]
+    : ["Son", "Daughter", "Partner", "Parent", "Sibling", "Friend", "Other family member", "Trusted supporter"];
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true); setError("");
     try { await action(); }
@@ -54,16 +59,16 @@ function VoiceFlow({ demo = false, configured, profile, onIntroduce, onUpload, o
       <p className="eyebrow">VOICE PROFILE</p>
       <h1>Voice setup<br /><span>complete.</span></h1>
       <p>{demo ? "You’ve tried the voice-setup experience. Your sample has been discarded. No account or voiceprint was created." : "Your voiceprint has been created and saved privately. Your original sample has been removed from Hale’s storage."}</p>
-      <div className="voice-next-note"><ShieldCheck size={20} /><p>{demo ? "Next, explore a fictional family space with synthetic memories." : "Your loved one approved the connection. Continue to your family dashboard to view what they choose to share. Voice enrollment does not grant memory access."}</p></div>
-      <Link href="/family/overview" className="btn btn-primary auth-submit">{demo ? "Return to workspace" : "Continue to my account"}<ArrowRight size={17} /></Link>
+      <div className="voice-next-note"><ShieldCheck size={20} /><p>{demo ? "Next, explore a fictional family space with synthetic memories." : patientAccount ? "Your voice profile is ready. You can separately consent to speaker matching in your patient space, then select expected people before recording. Voice labels are not identity verification." : "Your loved one approved the connection. Continue to your family dashboard to view what they choose to share. Voice enrollment does not grant memory access."}</p></div>
+      <Link href={demo ? "/family/overview" : dashboardHref} className="btn btn-primary auth-submit">{demo ? "Return to workspace" : "Continue to my account"}<ArrowRight size={17} /></Link>
       {!demo && <button disabled={busy} className="text-link voice-secondary voice-remove" onClick={() => void run(async () => { await onRevoke?.(); setConsent(false); setReopen(true); })}><Trash2 size={15} />Delete my voice profile & withdraw consent</button>}
       {error && <p className="error-text" role="alert">{error}</p>}
     </div> : <>
-      <div className="auth-intro voice-intro"><p className="eyebrow">{hasProfile ? "VOICE PROFILE" : "FAMILY PROFILE"}</p><h1>{hasProfile ? <>Set up your<br /><span>voice profile.</span></> : <>Introduce<br /><span>yourself.</span></>}</h1><p>{hasProfile ? "Voice enrollment is optional. You can skip it now and add a profile later; it is never used to sign in." : "Add your family profile to continue with optional voice enrollment. This does not grant access to another person’s memories."}</p></div>
+      <div className="auth-intro voice-intro"><p className="eyebrow">{hasProfile ? "VOICE PROFILE" : patientAccount ? "PATIENT PROFILE" : "FAMILY PROFILE"}</p><h1>{hasProfile ? <>Set up your<br /><span>voice profile.</span></> : patientAccount ? <>Set up your<br /><span>voice profile.</span></> : <>Introduce<br /><span>yourself.</span></>}</h1><p>{hasProfile ? "Voice enrollment is optional. You can skip it now and add a profile later; it is never used to sign in." : patientAccount ? "Create your optional voice profile for this patient space. It does not change your account or recording consent." : "Add your family profile to continue with optional voice enrollment. This does not grant access to another person’s memories."}</p></div>
       {demo && <div className="auth-demo-note"><FlaskConical size={17} /><p><strong>Local preview only.</strong> Recording uses your microphone, but nothing is uploaded or saved after you leave.</p></div>}
       {!hasProfile ? <form className="auth-form" onSubmit={(event) => { event.preventDefault(); void run(async () => { await onIntroduce?.(name, relationship); setIntroduced(true); }); }}>
         <label>Your full name<input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" minLength={2} maxLength={100} required disabled={!hydrated || busy} placeholder="e.g. Daniel Okafor" /></label>
-        <label>Your relationship<select value={relationship} disabled={!hydrated || busy} onChange={(event) => setRelationship(event.target.value)} required><option value="" disabled>How are you connected?</option>{["Son", "Daughter", "Partner", "Parent", "Sibling", "Friend", "Other family member", "Trusted supporter"].map((label) => <option key={label}>{label}</option>)}</select></label>
+        <label>{patientAccount ? "Your profile" : "Your relationship"}<select value={relationship} disabled={!hydrated || busy} onChange={(event) => setRelationship(event.target.value)} required><option value="" disabled>{patientAccount ? "Choose your profile" : "How are you connected?"}</option>{relationships.map((label) => <option key={label}>{label}</option>)}</select></label>
         <button className="btn btn-primary auth-submit" disabled={!hydrated || busy || name.trim().length < 2}>{busy ? "Saving…" : "Continue to voice setup"}<ArrowRight size={17} /></button>
       </form> : pending ? <div className="voice-processing" role="status"><LoaderCircle className="voice-spinner" size={30} /><h2>Getting to know your voice.</h2><p>Processing continues securely on the server. You can continue to your dashboard while it finishes.</p><button className="text-link voice-remove" disabled={busy} onClick={() => void run(async () => { await onRevoke?.(); setConsent(false); })}><Trash2 size={15} />Cancel enrollment & delete my sample</button></div> : <>
         {profile?.voiceState === "failed" && <p role="alert" className="voice-error">{profile.message ?? "Please record a new sample."}</p>}
@@ -87,7 +92,7 @@ function VoiceFlow({ demo = false, configured, profile, onIntroduce, onUpload, o
         </div>
         <p className="voice-tech-note"><ShieldCheck size={15} /><span>Your voice profile is never used for authentication. Enrollment is optional. <a href="https://github.com/pyannote/pyannote-audio" target="_blank" rel="noreferrer">About pyannote<ArrowRight size={11} /></a></span></p>
       </>}
-      <Link href="/family/overview" className="btn btn-quiet voice-skip">Skip voice setup<ArrowRight size={16} /></Link>
+      <Link href={demo ? "/family/overview" : dashboardHref} className="btn btn-quiet voice-skip">Skip voice setup<ArrowRight size={16} /></Link>
       {error && <p className="voice-error" role="alert">{error}</p>}
       {demo && <Link href="/signup" className="text-link voice-back"><ArrowLeft size={14} />Back to account</Link>}
     </>}
@@ -99,12 +104,14 @@ function LiveVoiceOnboarding() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const data = useQuery(api.voiceProfile, isAuthenticated ? {} : "skip");
   const familyCode = useQuery(api.familyCode, isAuthenticated ? {} : "skip");
+  const patientSpaces = useQuery(api.patients, isAuthenticated ? { role: "patient" } : "skip");
   const introduce = useMutation(api.saveFamilyProfile);
   const revoke = useMutation(api.revokeVoice);
-  if (!isLoaded || (isSignedIn && isLoading) || (isAuthenticated && (!data || familyCode === undefined))) return <AuthShell signup step={2}><p role="status">Opening your voice setup…</p></AuthShell>;
+  if (!isLoaded || (isSignedIn && isLoading) || (isAuthenticated && (!data || familyCode === undefined || patientSpaces === undefined))) return <AuthShell signup step={2}><p role="status">Opening your voice setup…</p></AuthShell>;
   if (!isSignedIn || !isAuthenticated) return <AuthShell signup step={1}><div className="auth-intro"><h1>{!isSignedIn ? "Your account comes first." : "Your connection needs attention."}</h1><p>{!isSignedIn ? "Create an account or log in before setting up your voice." : "Check the Clerk Convex JWT template and deployment issuer before continuing. No audio has been uploaded."}</p></div><Link className="btn btn-primary" href={!isSignedIn ? "/signup" : "/login"}>{!isSignedIn ? "Create an account" : "Back to login"}<ArrowRight size={16} /></Link></AuthShell>;
-  if (!familyCode?.linked && data!.profile?.voiceState !== "enrolled") return <AuthShell signup step={1}><div className="auth-intro"><h1>Connect with your loved one first.</h1><p>Once they scan your family code and approve sharing, you can optionally set up voice enrollment.</p></div><Link className="btn btn-primary" href="/family/overview">Open family dashboard<ArrowRight size={16} /></Link></AuthShell>;
-  return <VoiceFlow configured={data!.configured} profile={data!.profile}
+  const patientAccount = Boolean(patientSpaces!.length);
+  if (!patientAccount && !familyCode?.linked && data!.profile?.voiceState !== "enrolled") return <AuthShell signup step={1}><div className="auth-intro"><h1>Connect with your loved one first.</h1><p>Once they scan your family code and approve sharing, you can optionally set up voice enrollment.</p></div><Link className="btn btn-primary" href="/family/overview">Open family dashboard<ArrowRight size={16} /></Link></AuthShell>;
+  return <VoiceFlow patientAccount={patientAccount} configured={data!.configured} profile={data!.profile}
     onIntroduce={(name, relationship) => introduce({ name, relationship })}
     onRevoke={() => revoke({})}
     onUpload={async (sample) => {

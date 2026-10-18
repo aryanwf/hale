@@ -37,10 +37,7 @@ type Env = {
   readonly VAPID_PRIVATE_KEY: string | undefined;
   readonly VAPID_PUBLIC_KEY: string | undefined;
   readonly VAPID_SUBJECT: string | undefined;
-  readonly FAMILY_SUMMARIES_EMAIL_MODE: string | undefined;
   readonly FAMILY_SUMMARIES_ENABLED: string | undefined;
-  readonly FAMILY_SUMMARIES_FROM_EMAIL: string | undefined;
-  readonly FAMILY_SUMMARIES_TEST_EMAIL: string | undefined;
 };
 
 /**

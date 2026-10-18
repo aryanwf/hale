@@ -10,27 +10,10 @@ import * as accounts from "./accounts";
 
 const app = defineTestApp({ schema }).defineModules({ familySummaries, patients, families, privacy, accounts });
 const tests: ReturnType<typeof app.createTest>[] = [];
-const originalFetch = globalThis.fetch;
-const featureEnvKeys = [
-  "FAMILY_SUMMARIES_ENABLED", "FAMILY_SUMMARIES_EMAIL_MODE", "FAMILY_SUMMARIES_TEST_EMAIL",
-  "FAMILY_SUMMARIES_FROM_EMAIL", "RESEND_API_KEY",
-] as const;
-let previousEnv: Partial<Record<(typeof featureEnvKeys)[number], string | undefined>> = {};
-
-function mockFetch(handler: (url: string, init?: RequestInit) => Response | Promise<Response>) {
-  globalThis.fetch = Object.assign(async (input: RequestInfo | URL, init?: RequestInit) => handler(String(input), init), {
-    preconnect: originalFetch.preconnect,
-  });
-}
+const previousEnabled = process.env.FAMILY_SUMMARIES_ENABLED;
 
 beforeEach(() => {
-  previousEnv = Object.fromEntries(featureEnvKeys.map((key) => [key, process.env[key]]));
   process.env.FAMILY_SUMMARIES_ENABLED = "true";
-  process.env.FAMILY_SUMMARIES_EMAIL_MODE = "live";
-  process.env.FAMILY_SUMMARIES_FROM_EMAIL = "summaries@example.test";
-  process.env.RESEND_API_KEY = "resend-test-key";
-  delete process.env.FAMILY_SUMMARIES_TEST_EMAIL;
-  globalThis.fetch = originalFetch;
 });
 
 afterEach(async () => {
@@ -42,12 +25,8 @@ afterEach(async () => {
     });
     await t.finishInProgressScheduledFunctions();
   }
-  globalThis.fetch = originalFetch;
-  for (const key of featureEnvKeys) {
-    const value = previousEnv[key];
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
+  if (previousEnabled === undefined) delete process.env.FAMILY_SUMMARIES_ENABLED;
+  else process.env.FAMILY_SUMMARIES_ENABLED = previousEnabled;
 });
 
 async function setup(timezone = "UTC") {
@@ -83,14 +62,10 @@ async function addSource(t: ReturnType<typeof app.createTest>, patientId: Id<"pa
   });
 }
 
-async function enablePreferences(family: ReturnType<ReturnType<typeof app.createTest>["withIdentity"]>, patientId: Id<"patients">, nightly: boolean, weekly: boolean) {
-  await family.mutation(app.api.familySummaries.setPreferences, { patientId, nightly, weekly });
-}
-
 async function rows(t: ReturnType<typeof app.createTest>, patientId: Id<"patients">) {
   return t.run(async (ctx) => ({
     summaries: await ctx.db.query("familySummaries").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(100),
-    deliveries: await ctx.db.query("familySummaryDeliveries").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(100),
+    legacyDeliveries: await ctx.db.query("familySummaryDeliveries").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(100),
   }));
 }
 
@@ -99,7 +74,6 @@ describe("family summaries", () => {
     const { t, family, patientId } = await setup();
     const date = "2026-10-16";
     const source = await addSource(t, patientId, date, "We watered the garden together.");
-    await enablePreferences(family, patientId, true, false);
     const now = Date.parse(`${date}T21:00:00Z`);
 
     await t.mutation(app.internal.familySummaries.generateForPatient, { patientId, now });
@@ -108,8 +82,9 @@ describe("family summaries", () => {
     const stored = await rows(t, patientId);
     expect(stored.summaries).toHaveLength(1);
     expect(stored.summaries[0]).toMatchObject({ kind: "nightly", periodKey: date, sourceTurnIds: [source.turnId] });
-    expect(stored.deliveries).toHaveLength(1);
+    expect(stored.legacyDeliveries).toEqual([]);
     const read = await family.query(app.api.familySummaries.read, { patientId });
+    expect(read).toMatchObject({ enabled: true });
     expect(read.summaries[0]?.entries).toMatchObject([{ excerpt: "We watered the garden together.", conversationId: source.conversationId, turnId: source.turnId }]);
     expect(read.summaries[0]?.intro).toContain("Direct excerpts");
   });
@@ -125,147 +100,52 @@ describe("family summaries", () => {
     expect(scheduled[0]?.args).toContainEqual({ patientId, now: Date.parse("2026-10-19T04:00:00Z") });
   });
 
-  test("Sunday creates a separate weekly summary and sends nightly before weekly", async () => {
+  test("Sunday creates a separate weekly recap without creating delivery work", async () => {
     const { t, family, patientId } = await setup();
     await addSource(t, patientId, "2026-10-12", "We visited the library on Monday.");
     await addSource(t, patientId, "2026-10-18", "We shared tea on Sunday.");
-    await enablePreferences(family, patientId, true, true);
     const now = Date.parse("2026-10-18T21:00:00Z");
-    const sentSubjects: string[] = [];
-    mockFetch((_url, init) => {
-      const body = JSON.parse(String(init?.body)) as { subject: string; to: string[]; text: string };
-      sentSubjects.push(body.subject);
-      expect(body.to).toEqual(["family@example.test"]);
-      expect(body.text).toContain("direct excerpts");
-      return Response.json({ id: "synthetic-email" });
-    });
 
     await t.mutation(app.internal.familySummaries.generateForPatient, { patientId, now });
+
     const stored = await rows(t, patientId);
     expect(stored.summaries.map((summary) => summary.kind).sort()).toEqual(["nightly", "weekly"]);
-    const nightly = stored.summaries.find((summary) => summary.kind === "nightly")!;
     const weekly = stored.summaries.find((summary) => summary.kind === "weekly")!;
-    expect(weekly).toMatchObject({ periodStart: "2026-10-12", periodEnd: "2026-10-18", afterSummaryId: nightly._id });
-    const nightlyDelivery = stored.deliveries.find((delivery) => delivery.summaryId === nightly._id)!;
-    const weeklyDelivery = stored.deliveries.find((delivery) => delivery.summaryId === weekly._id)!;
-
-    await t.action(app.internal.familySummaries.deliver, { deliveryId: weeklyDelivery._id, now });
-    expect(sentSubjects).toEqual([]);
-    await t.action(app.internal.familySummaries.deliver, { deliveryId: nightlyDelivery._id, now });
-    await t.action(app.internal.familySummaries.deliver, { deliveryId: weeklyDelivery._id, now });
-    expect(sentSubjects).toEqual(["Your Hale nightly family summary", "Your Hale weekly family summary"]);
-    expect((await rows(t, patientId)).deliveries.every((delivery) => delivery.status === "sent")).toBe(true);
+    expect(weekly).toMatchObject({ periodStart: "2026-10-12", periodEnd: "2026-10-18" });
+    expect(weekly.afterSummaryId).toBeUndefined();
+    expect(stored.legacyDeliveries).toEqual([]);
+    expect((await family.query(app.api.familySummaries.read, { patientId })).summaries).toHaveLength(2);
   });
 
-  test("retries transient provider failures and records delivery attempts", async () => {
-    const { t, family, patientId } = await setup();
-    const date = "2026-10-16";
-    await addSource(t, patientId, date, "The synthetic appointment is on Tuesday.");
-    await enablePreferences(family, patientId, true, false);
-    const now = Date.parse(`${date}T21:00:00Z`);
-    let calls = 0;
-    mockFetch(() => ++calls === 1 ? Response.json({ error: "temporary" }, { status: 503 }) : Response.json({ id: "synthetic-email" }));
-    await t.mutation(app.internal.familySummaries.generateForPatient, { patientId, now });
-    const delivery = (await rows(t, patientId)).deliveries[0]!;
-
-    await t.action(app.internal.familySummaries.deliver, { deliveryId: delivery._id, now });
-    expect((await rows(t, patientId)).deliveries[0]).toMatchObject({ status: "queued", attempts: 1, lastError: "Email provider returned HTTP 503." });
-    await t.action(app.internal.familySummaries.deliver, { deliveryId: delivery._id, now: now + 30_000 });
-    expect((await rows(t, patientId)).deliveries[0]).toMatchObject({ status: "sent", attempts: 2 });
-    expect(calls).toBe(2);
-  });
-
-  test("family authorization and current membership are rechecked before delivery", async () => {
-    const { t, owner, family, patientId } = await setup();
-    const date = "2026-10-16";
-    await addSource(t, patientId, date, "Only an authorized family can receive this.");
-    await enablePreferences(family, patientId, true, false);
-    await t.mutation(app.internal.familySummaries.generateForPatient, { patientId, now: Date.parse(`${date}T21:00:00Z`) });
-    const delivery = (await rows(t, patientId)).deliveries[0]!;
-    let sends = 0;
-    mockFetch(() => { sends++; return Response.json({ id: "synthetic-email" }); });
-
-    await expect(t.withIdentity({ subject: "outsider" }).query(app.api.familySummaries.read, { patientId })).rejects.toThrow("permission");
-    await expect(owner.query(app.api.familySummaries.read, { patientId })).rejects.toThrow("authorized family members");
-    await t.run(async (ctx) => {
-      const membership = await ctx.db.query("memberships").withIndex("by_patient_subject", (q) => q.eq("patientId", patientId).eq("subject", "synthetic-family")).unique();
-      await ctx.db.patch(membership!._id, { active: false });
-    });
-    await t.action(app.internal.familySummaries.deliver, { deliveryId: delivery._id, now: Date.now() });
-    expect(sends).toBe(0);
-    expect((await rows(t, patientId)).deliveries[0]).toMatchObject({ status: "skipped", skippedReason: "Family access is no longer active." });
-  });
-
-  test("email preferences require the signed-in family member's verified email claim", async () => {
-    const { t, family, patientId } = await setup();
-    const unverifiedFamily = t.withIdentity({ subject: "synthetic-family", email: "family@example.test", emailVerified: false });
-    await expect(unverifiedFamily.mutation(app.api.familySummaries.setPreferences, { patientId, nightly: true, weekly: false })).rejects.toThrow("verified email");
-    expect(await unverifiedFamily.query(app.api.familySummaries.read, { patientId })).toMatchObject({
-      verifiedEmailAvailable: false,
-      preferences: { nightly: false, weekly: false },
-    });
-    await enablePreferences(family, patientId, true, true);
-    await unverifiedFamily.mutation(app.api.familySummaries.setPreferences, { patientId, nightly: false, weekly: true });
-    expect(await unverifiedFamily.query(app.api.familySummaries.read, { patientId })).toMatchObject({
-      preferences: { nightly: false, weekly: true },
-    });
-  });
-
-  test("the flag-off path does not generate, schedule, or deliver; queued work resumes safely after re-enable", async () => {
-    const { t, family, patientId } = await setup();
+  test("the feature flag prevents summary work until re-enabled", async () => {
+    const { t, patientId } = await setup();
     const date = "2026-10-16";
     await addSource(t, patientId, date, "Synthetic flag test source.");
-    await enablePreferences(family, patientId, true, false);
     const now = Date.parse(`${date}T21:00:00Z`);
-    await t.mutation(app.internal.familySummaries.generateForPatient, { patientId, now });
-    const delivery = (await rows(t, patientId)).deliveries[0]!;
-    const before = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
-    let sends = 0;
-    mockFetch(() => { sends++; return Response.json({ id: "synthetic-email" }); });
 
     process.env.FAMILY_SUMMARIES_ENABLED = "false";
     await t.mutation(app.internal.familySummaries.tick, {});
-    await t.mutation(app.internal.familySummaries.generateForPatient, { patientId, now: now + 86_400_000 });
-    await t.action(app.internal.familySummaries.deliver, { deliveryId: delivery._id, now });
-    const after = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
-    expect(after).toHaveLength(before.length);
-    expect((await rows(t, patientId)).summaries).toHaveLength(1);
-    expect(sends).toBe(0);
+    await t.mutation(app.internal.familySummaries.generateForPatient, { patientId, now });
+    expect((await rows(t, patientId)).summaries).toHaveLength(0);
+    expect(await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(0);
 
     process.env.FAMILY_SUMMARIES_ENABLED = "true";
-    await t.action(app.internal.familySummaries.deliver, { deliveryId: delivery._id, now: now + 30_000 });
-    expect(sends).toBe(1);
+    await t.mutation(app.internal.familySummaries.generateForPatient, { patientId, now });
+    expect((await rows(t, patientId)).summaries).toHaveLength(1);
+    expect((await rows(t, patientId)).legacyDeliveries).toEqual([]);
   });
 
-  test("isolated test email goes only to the configured test inbox and contains no patient data", async () => {
-    const { t, family, patientId } = await setup();
-    await enablePreferences(family, patientId, false, false);
-    process.env.FAMILY_SUMMARIES_EMAIL_MODE = "test";
-    process.env.FAMILY_SUMMARIES_TEST_EMAIL = "synthetic-inbox@example.test";
-    let sentTo = "";
-    let emailText = "";
-    mockFetch((_url, init) => {
-      const body = JSON.parse(String(init?.body)) as { to: string[]; subject: string; text: string };
-      sentTo = body.to[0]!;
-      emailText = body.text;
-      expect(body.subject).toContain("[TEST]");
-      return Response.json({ id: "synthetic-test-email" });
-    });
-
-    const settings = await family.query(app.api.familySummaries.read, { patientId });
-    expect(settings.testEmailAvailable).toBe(true);
-    expect(await family.action(app.api.familySummaries.sendTestEmail, { patientId })).toEqual({ sent: true });
-    expect(sentTo).toBe("synthetic-inbox@example.test");
-    expect(emailText).toContain("contains no patient data");
-    expect(emailText).not.toContain("Fictional Patient");
-    expect((await family.query(app.api.familySummaries.read, { patientId })).preferences).toEqual({ nightly: false, weekly: false });
+  test("family authorization is checked before reading summaries", async () => {
+    const { t, owner, family, patientId } = await setup();
+    await expect(t.withIdentity({ subject: "outsider" }).query(app.api.familySummaries.read, { patientId })).rejects.toThrow("permission");
+    await expect(owner.query(app.api.familySummaries.read, { patientId })).rejects.toThrow("authorized family members");
+    expect(await family.query(app.api.familySummaries.read, { patientId })).toMatchObject({ enabled: true, summaries: [] });
   });
 
   test("deleting a source removes its quote from the rendered summary", async () => {
     const { t, owner, family, patientId } = await setup();
     const date = "2026-10-16";
     const source = await addSource(t, patientId, date, "This synthetic source should disappear when deleted.");
-    await enablePreferences(family, patientId, false, false);
     await t.mutation(app.internal.familySummaries.generateForPatient, { patientId, now: Date.parse(`${date}T21:00:00Z`) });
 
     await owner.mutation(app.api.privacy.deleteConversation, { conversationId: source.conversationId });
@@ -274,16 +154,27 @@ describe("family summaries", () => {
     expect(read.summaries[0]?.intro).toContain("No processed");
   });
 
-  test("patient account deletion removes its summary, preferences, and delivery records", async () => {
-    const { t, owner, family, patientId } = await setup();
+  test("account deletion also clears retained legacy summary email records", async () => {
+    const { t, owner, patientId } = await setup();
     const date = "2026-10-16";
     await addSource(t, patientId, date, "Synthetic account deletion source.");
-    await enablePreferences(family, patientId, true, false);
-    await t.mutation(app.internal.familySummaries.generateForPatient, { patientId, now: Date.parse(`${date}T21:00:00Z`) });
-    expect((await rows(t, patientId)).deliveries).toHaveLength(1);
+    const now = Date.parse(`${date}T21:00:00Z`);
+    await t.mutation(app.internal.familySummaries.generateForPatient, { patientId, now });
+    const summary = (await rows(t, patientId)).summaries[0]!;
+    await t.run(async (ctx) => {
+      await ctx.db.insert("familySummaryPreferences", {
+        patientId, subject: "synthetic-family", nightly: true, weekly: false,
+        email: "family@example.test", updatedAt: now, testEmailSentAt: now,
+      });
+      await ctx.db.insert("familySummaryDeliveries", {
+        patientId, summaryId: summary._id, recipientSubject: "synthetic-family",
+        status: "sent", attempts: 1, nextAttemptAt: now, createdAt: now, deliveredAt: now,
+      });
+    });
+    expect((await rows(t, patientId)).legacyDeliveries).toHaveLength(1);
 
     await owner.mutation(app.api.accounts.deleteMyData, { confirmation: "DELETE" });
-    expect(await rows(t, patientId)).toEqual({ summaries: [], deliveries: [] });
+    expect(await rows(t, patientId)).toEqual({ summaries: [], legacyDeliveries: [] });
     expect(await t.run((ctx) => ctx.db.query("familySummaryPreferences").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(10))).toEqual([]);
   });
 });

@@ -11,8 +11,5 @@ export default defineApp({
     VAPID_PRIVATE_KEY: v.optional(v.string()),
     VAPID_SUBJECT: v.optional(v.string()),
     FAMILY_SUMMARIES_ENABLED: v.optional(v.string()),
-    FAMILY_SUMMARIES_EMAIL_MODE: v.optional(v.string()),
-    FAMILY_SUMMARIES_TEST_EMAIL: v.optional(v.string()),
-    FAMILY_SUMMARIES_FROM_EMAIL: v.optional(v.string()),
   },
 });

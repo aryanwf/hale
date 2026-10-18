@@ -18,21 +18,13 @@ export type FamilySummaryCard = {
   generatedAt: number;
   intro: string;
   entries: FamilySummaryEntry[];
-  deliveryState: "queued" | "sending" | "sent" | "failed" | "skipped" | null;
-  deliveredAt: number | null;
 };
 
 export type FamilySummaryRead = {
   enabled: boolean;
-  notificationDeliveryConfigured: boolean;
-  testEmailAvailable: boolean;
-  verifiedEmailAvailable: boolean;
-  preferences: { nightly: boolean; weekly: boolean };
   summaries: FamilySummaryCard[];
 };
 
 export const familySummaryApi = {
   read: makeFunctionReference<"query", { patientId: string }, FamilySummaryRead>("familySummaries:read"),
-  setPreferences: makeFunctionReference<"mutation", { patientId: string; nightly: boolean; weekly: boolean }, null>("familySummaries:setPreferences"),
-  sendTestEmail: makeFunctionReference<"action", { patientId: string }, { sent: boolean }>("familySummaries:sendTestEmail"),
 };

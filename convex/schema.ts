@@ -120,10 +120,14 @@ export default defineSchema({
     periodKey: v.string(), periodStart: v.string(), periodEnd: v.string(),
     // Keep only source IDs, never copied transcript text, so source deletion stays effective.
     sourceTurnIds: v.array(v.id("transcriptTurns")),
-    generatedAt: v.number(), afterSummaryId: v.optional(v.id("familySummaries")),
+    generatedAt: v.number(),
+    // Legacy email-ordering field; retained so existing summary documents remain valid.
+    afterSummaryId: v.optional(v.id("familySummaries")),
   }).index("by_patient_kind_period", ["patientId", "kind", "periodKey"])
     .index("by_patient_generatedAt", ["patientId", "generatedAt"])
     .index("by_patient", ["patientId"]),
+  // Legacy notification records are retained for existing data and account-deletion cleanup.
+  // Family summaries no longer read or write these tables.
   familySummaryPreferences: defineTable({
     patientId: v.id("patients"), subject: v.string(),
     nightly: v.boolean(), weekly: v.boolean(), email: v.optional(v.string()),

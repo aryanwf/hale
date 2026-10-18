@@ -19,7 +19,7 @@ export async function refreshLiveConversation(ctx: MutationCtx, conversationId: 
   const failures = conversation.failedChunks ?? 0;
   await ctx.db.patch(conversationId, {
     state: recording || pending > 0 ? "processing" : failures > 0 && failures === conversation.processedChunks ? "failed" : "ready",
-    summary: `${recording ? "Listening. Dialogue is appended as each segment is transcribed." : pending ? "Recording stopped. Finishing the remaining transcript." : "Recording finished. Transcript text is saved; temporary audio is deleted after processing."}${failures ? ` ${failures} segment(s) could not be transcribed; there may be gaps.` : ""}`,
+    summary: `${recording ? "Listening. Dialogue and any selected-speaker matches are added as each segment is processed." : pending ? "Recording stopped. Finishing transcription and any selected-speaker checks." : "Recording finished. Transcript text is saved; temporary audio is deleted after processing."}${failures ? ` ${failures} segment(s) could not be transcribed; there may be gaps.` : ""}`,
   });
 }
 

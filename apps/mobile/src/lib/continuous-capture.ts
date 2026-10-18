@@ -37,7 +37,7 @@ interface Dependencies {
   owner: string;
   patientId: string;
   requestPermissions(): Promise<void>;
-  beginSession(): Promise<string>;
+  beginSession(expectedPeople: string[]): Promise<string>;
   endSession(id: string): Promise<void>;
   uploadCredentials(): Promise<{ siteUrl: string; token: string }>;
 }
@@ -85,7 +85,7 @@ export class ContinuousCaptureController {
     } finally { this.observing = false; }
   };
 
-  start = async (consented: boolean) => {
+  start = async (consented: boolean, expectedPeople: string[] = []) => {
     const { native, owner, patientId } = this.dependencies;
     if (!native || this.busy || this.disposed || this.snapshot.hasActiveRecording) return;
     if (!consented) { this.update({ message: "Everyone present must agree before you switch recording on." }); return; }
@@ -100,7 +100,7 @@ export class ContinuousCaptureController {
       await this.dependencies.requestPermissions();
       const credentials = await this.dependencies.uploadCredentials();
       if (this.disposed) return;
-      sessionId = await this.dependencies.beginSession();
+      sessionId = await this.dependencies.beginSession(expectedPeople);
       if (this.disposed) throw new Error("Hale closed before recording could start.");
       await native.start(JSON.stringify({ ...credentials, owner, patientId, sessionId }));
       this.update({ sessionId, hasActiveRecording: true, seconds: 0 });

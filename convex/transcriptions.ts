@@ -212,12 +212,20 @@ export const complete = internalMutation({
         turnIds: committedTurnIds,
       });
     }
+    const speakerJob = await ctx.db.query("speakerMatchingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", chunk._id)).unique();
     if (conversation.sessionId) {
-      await deleteTemporaryAudio(ctx, chunk._id, chunk.storageId);
-      await settleLiveChunk(ctx, conversation, "ready");
+      if (speakerJob && args.turns.length) {
+        await ctx.db.patch(conversation._id, {
+          summary: "Transcript prepared. Checking only the people selected for this conversation; other or uncertain voices remain unknown.",
+        });
+        await ctx.scheduler.runAfter(0, speakerMatchingRef, { jobId: speakerJob._id });
+      } else {
+        if (speakerJob) await ctx.db.patch(speakerJob._id, { state: "skipped", error: undefined, updatedAt: now, generation: speakerJob.generation + 1 });
+        await deleteTemporaryAudio(ctx, chunk._id, chunk.storageId);
+        await settleLiveChunk(ctx, conversation, "ready");
+      }
       return true;
     }
-    const speakerJob = await ctx.db.query("speakerMatchingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", chunk._id)).unique();
     await ctx.db.patch(conversation._id, {
       state: speakerJob ? "processing" : "ready",
       title: "Recorded conversation",

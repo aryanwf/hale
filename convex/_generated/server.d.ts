@@ -32,12 +32,12 @@ type Env = {
   readonly CONVEX_SITE_URL: string;
   readonly APP_ORIGIN: string | undefined;
   readonly EMAIL_FROM: string | undefined;
+  readonly FAMILY_SUMMARIES_ENABLED: string | undefined;
   readonly RESEND_API_KEY: string | undefined;
   readonly SARVAM_API_KEY: string | undefined;
   readonly VAPID_PRIVATE_KEY: string | undefined;
   readonly VAPID_PUBLIC_KEY: string | undefined;
   readonly VAPID_SUBJECT: string | undefined;
-  readonly FAMILY_SUMMARIES_ENABLED: string | undefined;
 };
 
 /**

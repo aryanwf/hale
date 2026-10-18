@@ -163,7 +163,7 @@ export const setVoiceMatchingConsent = mutation({
       .unique();
     if (!person && membership.role === "patient") {
       person = (await ctx.db.query("people").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(100))
-        .find((candidate) => candidate.relationship === "You · patient") ?? null;
+        .find((candidate) => candidate.isPatient ?? (candidate.relationship === "You · patient" && !candidate.linkedSubject)) ?? null;
     }
     if (!person) throw new ConvexError("Your family profile is not linked to this patient space.");
 

@@ -24,7 +24,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
   const [controller] = useState(() => new ContinuousCaptureController({
     native: workspace.mode === "live" ? native : null,
     owner: workspace.owner, patientId: workspace.space.id,
-    beginSession: () => latestWorkspace.current.beginContinuousSession(),
+    beginSession: (expectedPeople) => latestWorkspace.current.beginContinuousSession(expectedPeople),
     endSession: (id) => latestWorkspace.current.endSession(id),
     uploadCredentials: () => latestWorkspace.current.uploadCredentials(),
     requestPermissions: async () => {

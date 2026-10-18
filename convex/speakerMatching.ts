@@ -3,6 +3,7 @@ import { v, type GenericId } from "convex/values";
 import { VOICE_MATCHING_POLICY } from "@hale/contracts/voice";
 import { PyannoteApiError, pyannoteRequest } from "./lib/pyannote";
 import { matchTranscriptTurns, type MatchCandidate } from "./lib/speakerMatching";
+import { settleLiveChunk } from "./lib/liveConversations";
 import { internalAction, internalMutation, internalQuery, type DataModel, type MutationCtx } from "./lib/functions";
 import { hasExternalAIConsent } from "./authz";
 
@@ -116,16 +117,21 @@ export const read = internalQuery({
     const job = await ctx.db.get(jobId);
     if (!job || job.state !== "processing" || job.generation !== generation || !job.providerJobId) return null;
     if (!await hasExternalAIConsent(ctx, job.patientId)) return null;
-    const [turns, chunk] = await Promise.all([
-      ctx.db.query("transcriptTurns").withIndex("by_conversation", (q) => q.eq("conversationId", job.conversationId)).take(500),
+    const [chunk, conversation] = await Promise.all([
       ctx.db.get(job.chunkId),
+      ctx.db.get(job.conversationId),
     ]);
-    if (!chunk || chunk.deletedAt || chunk.patientId !== job.patientId) return null;
+    if (!chunk || chunk.deletedAt || chunk.patientId !== job.patientId || !conversation || conversation.deletedAt || conversation.patientId !== job.patientId) return null;
+    const durationSeconds = (chunk.endedAt - chunk.capturedAt) / 1000;
+    const offsetSeconds = conversation.sessionId ? (chunk.capturedAt - conversation.startedAt) / 1000 : 0;
+    const turns = await ctx.db.query("transcriptTurns")
+      .withIndex("by_conversation", (q) => q.eq("conversationId", job.conversationId).gte("start", offsetSeconds).lt("start", offsetSeconds + durationSeconds))
+      .take(500);
     return {
       providerJobId: job.providerJobId,
       candidates: (job.candidates ?? []).map(({ label, personId }) => ({ label, personId })),
-      turns: turns.filter((turn) => turn.patientId === job.patientId).map(({ _id, start, end }) => ({ id: _id, start, end })),
-      durationSeconds: (chunk.endedAt - chunk.capturedAt) / 1000,
+      turns: turns.filter((turn) => turn.patientId === job.patientId && turn.chunkId === chunk._id).map(({ _id, start, end }) => ({ id: _id, start: start - offsetSeconds, end: end - offsetSeconds })),
+      durationSeconds,
     };
   },
 });
@@ -169,13 +175,18 @@ export const complete = internalMutation({
 
     await ctx.db.patch(job._id, { state: "ready", providerJobId: undefined, updatedAt: Date.now(), error: undefined });
     await deleteTemporaryAudio(ctx, chunk._id, chunk.storageId);
-    await ctx.db.patch(conversation._id, {
-      state: "ready",
-      people: [...matchedPeople],
-      summary: matchedPeople.size
-        ? "Transcript prepared. Speaker labels are automated and may be wrong; unrecognized or uncertain speech remains unknown. The source recording was deleted after processing."
-        : "Transcript prepared. No speaker met the matching safeguards, so every voice remains unknown. The source recording was deleted after processing.",
-    });
+    if (conversation.sessionId) {
+      await ctx.db.patch(conversation._id, { people: [...new Set([...conversation.people, ...matchedPeople])] });
+      await settleLiveChunk(ctx, conversation, "ready");
+    } else {
+      await ctx.db.patch(conversation._id, {
+        state: "ready",
+        people: [...matchedPeople],
+        summary: matchedPeople.size
+          ? "Transcript prepared. Speaker labels are automated and may be wrong; unrecognized or uncertain speech remains unknown. The source recording was deleted after processing."
+          : "Transcript prepared. No speaker met the matching safeguards, so every voice remains unknown. The source recording was deleted after processing.",
+      });
+    }
     return true;
   },
 });
@@ -310,7 +321,8 @@ async function finishWithoutMatches(ctx: MutationCtx, job: DataModel["speakerMat
     ctx.db.query("processingJobs").withIndex("by_chunk", (q) => q.eq("chunkId", job.chunkId)).unique(),
   ]);
   if (conversation && !conversation.deletedAt && transcription?.state === "ready") {
-    await ctx.db.patch(conversation._id, { state: "ready", summary });
+    if (conversation.sessionId) await settleLiveChunk(ctx, conversation, "ready");
+    else await ctx.db.patch(conversation._id, { state: "ready", summary });
   }
 }
 

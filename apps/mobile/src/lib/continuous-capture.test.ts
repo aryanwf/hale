@@ -43,6 +43,12 @@ describe("continuous recording toggle", () => {
     expect(JSON.parse((native.start as ReturnType<typeof mock>).mock.calls[0][0])).toMatchObject({ owner: "owner", patientId: "patient", sessionId: "session", siteUrl: "https://example.convex.site", token: "test-token" });
   });
 
+  test("the backend session records only the explicitly selected speaker profiles", async () => {
+    const { controller, backend } = setup();
+    await controller.start(true, ["person-1", "person-2"]);
+    expect(backend.beginSession).toHaveBeenCalledWith(["person-1", "person-2"]);
+  });
+
   test("a failed native start closes its unused backend session", async () => {
     const { controller, native, backend } = setup();
     native.start = async () => { throw new Error("Native failure"); };

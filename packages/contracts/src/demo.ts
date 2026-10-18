@@ -9,9 +9,9 @@ export const demoSpace: PatientSpace = {
   timezone: "America/New_York",
   capabilities: PATIENT_CAPABILITIES,
   people: [
-    { id: "margaret", name: "Margaret Okafor", initials: "MO", relationship: "You · patient", enrollment: "enrolled", voiceMatchingAvailable: false, color: "green" },
-    { id: "grace", name: "Grace Okafor", initials: "GO", relationship: "Sister", enrollment: "enrolled", voiceMatchingAvailable: false, color: "blue" },
-    { id: "daniel", name: "Daniel Okafor", initials: "DO", relationship: "Son", enrollment: "enrolled", voiceMatchingAvailable: false, color: "sand" },
+    { id: "margaret", name: "Margaret Okafor", initials: "MO", relationship: "You · patient", enrollment: "enrolled", voiceMatchingAvailable: false, voiceMatchingConsent: false, isMe: true, color: "green" },
+    { id: "grace", name: "Grace Okafor", initials: "GO", relationship: "Sister", enrollment: "enrolled", voiceMatchingAvailable: false, voiceMatchingConsent: false, isMe: false, color: "blue" },
+    { id: "daniel", name: "Daniel Okafor", initials: "DO", relationship: "Son", enrollment: "enrolled", voiceMatchingAvailable: false, voiceMatchingConsent: false, isMe: false, color: "sand" },
   ],
   conversations: [
     {

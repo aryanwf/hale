@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { defineTestApp } from "convex-test";
+import { VOICE_MATCHING_POLICY } from "@hale/contracts/voice";
 import schema from "./schema";
 import * as patients from "./patients";
 import * as people from "./people";
+import * as conversations from "./conversations";
 
-const app = defineTestApp({ schema }).defineModules({ patients, people });
+const app = defineTestApp({ schema }).defineModules({ patients, people, conversations });
 
 async function setup() {
   const t = app.createTest();
@@ -90,6 +92,22 @@ describe("patient family invitations and voice consent", () => {
       q.eq("patientId", patientId).eq("subject", "patient-owner"),
     ).unique());
     expect(membership).toMatchObject({ role: "patient", active: true });
+  });
+
+  test("the Android speaker picker exposes the patient only after enrollment and matching consent", async () => {
+    const { t, owner, patientId } = await setup();
+    await owner.mutation(app.api.people.setVoiceMatchingConsent, { patientId, enabled: true });
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      await ctx.db.insert("familyProfiles", {
+        subject: "patient-owner", name: "Margaret Okafor", relationship: "You · patient",
+        voiceState: "enrolled", consentAt: now, policyVersion: "test-enrollment-policy",
+        voiceprint: "synthetic-test-voiceprint", enrollmentVersion: 1, updatedAt: now,
+      });
+    });
+
+    const space = await owner.query(app.api.conversations.space, { patientId });
+    expect(space.people[0]).toMatchObject({ isMe: true, voiceMatchingConsent: true, voiceMatchingAvailable: true });
   });
 
   test("a family-entered relationship cannot masquerade as the patient person", async () => {

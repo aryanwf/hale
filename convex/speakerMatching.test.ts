@@ -67,7 +67,7 @@ async function setup() {
     });
     await ctx.db.insert("processingJobs", { patientId, chunkId, state: "ready", attempts: 1, generation: 1, createdAt: now, updatedAt: now });
     const turnId = await ctx.db.insert("transcriptTurns", {
-      patientId, conversationId, speaker: "Unknown speaker", start: 0, end: 4,
+      patientId, conversationId, chunkId, speaker: "Unknown speaker", start: 0, end: 4,
       text: "Hello there.", uncertain: true,
     });
     const jobId = await ctx.db.insert("speakerMatchingJobs", {

@@ -36,7 +36,7 @@ export const start = mutation({
     await requireRecordingConsent(ctx, patientId, identity.subject);
     if (!await hasExternalAIConsent(ctx, patientId)) throw new ConvexError("Enable external AI processing in Privacy & Security before starting a recording.");
     if (!participantsConsented) throw new ConvexError("Confirm consent from everyone taking part before recording.");
-    if (continuous && (captureMode !== "native" || expectedPeople.length)) throw new ConvexError("Live recording requires the native app. Live speakers remain unnamed.");
+    if (continuous && captureMode !== "native") throw new ConvexError("Live recording requires the native app.");
     if (expectedPeople.length > 50 || new Set(expectedPeople).size !== expectedPeople.length) throw new ConvexError("Choose up to 50 different people to recognize.");
     for (const personId of expectedPeople) {
       const person = await ctx.db.get(personId);

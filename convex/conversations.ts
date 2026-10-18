@@ -8,7 +8,7 @@ import { VOICE_MATCHING_POLICY } from "@hale/contracts/voice";
 import { paginationOptsValidator } from "convex/server";
 
 export async function loadSpace(ctx: QueryCtx, patientId: GenericId<"patients">, options: { day?: string; includeTurns?: boolean } = {}): Promise<{ space: PatientSpace; limited: boolean }> {
-    const { patient, membership } = await requireMember(ctx, patientId, "memories:read");
+    const { identity, patient, membership } = await requireMember(ctx, patientId, "memories:read");
     const conversations = await ctx.db.query("conversations").withIndex("by_patient_date", (q) => options.day ? q.eq("patientId", patientId).eq("localDate", options.day) : q.eq("patientId", patientId)).order("desc").take(101);
     const people = await ctx.db.query("people").withIndex("by_patient", (q) => q.eq("patientId", patientId)).take(100);
     const memories = await ctx.db.query("memories").withIndex("by_patient_date", (q) => options.day ? q.eq("patientId", patientId).eq("localDate", options.day) : q.eq("patientId", patientId)).order("desc").take(501);
@@ -37,10 +37,13 @@ export async function loadSpace(ctx: QueryCtx, patientId: GenericId<"patients">,
       people: await Promise.all(people.map(async (person) => ({
         id: person._id,
         name: person.name,
-        relationship: person.relationship,
-        enrollment: person.enrollment,
-        voiceMatchingAvailable: await canMatchPerson(ctx, patientId, patient.createdBy, person),
-        initials: person.name.split(" ").map((part) => part[0]).slice(0, 2).join(""),
+         relationship: person.relationship,
+         enrollment: person.enrollment,
+         voiceMatchingAvailable: await canMatchPerson(ctx, patientId, patient.createdBy, person),
+          voiceMatchingConsent: (person.linkedSubject === identity.subject || (membership.role === "patient" && (person.isPatient ?? (person.relationship === "You · patient" && !person.linkedSubject))))
+            && Boolean(person.voiceConsentAt && person.voiceConsentPolicy === VOICE_MATCHING_POLICY),
+          isMe: person.linkedSubject === identity.subject || (membership.role === "patient" && (person.isPatient ?? (person.relationship === "You · patient" && !person.linkedSubject))),
+         initials: person.name.split(" ").map((part) => part[0]).slice(0, 2).join(""),
         color: "green" as const,
       }))),
       conversations: records,

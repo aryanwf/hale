@@ -1,5 +1,8 @@
 import { Alert, Linking, Text, View } from "react-native";
-import { Button, Empty, Notice, Page } from "../components/ui";
+import { useState } from "react";
+import { useMutation } from "convex/react";
+import { api } from "@hale/contracts/api";
+import { Button, Check, Empty, Notice, Page } from "../components/ui";
 import { useCapture } from "../providers/capture";
 import { useWorkspace } from "../providers/workspace";
 import { config } from "../lib/config";
@@ -35,6 +38,7 @@ export function MoreScreen() {
       {space.people.length ? space.people.map((person) => <View key={person.id} style={styles.card}>
         <View style={styles.row}><View style={styles.avatar}><Text style={styles.title}>{person.initials}</Text></View><View style={styles.grow}><Text style={styles.title}>{person.name}</Text><Text style={styles.small}>{person.relationship}</Text></View></View>
         <Text style={styles.small}>{mode === "demo" ? "Demo profile · no real voiceprint" : person.enrollment === "enrolled" ? "Voice enrolled with consent" : person.enrollment === "revoked" ? "Voice enrollment revoked" : "Voice not enrolled"}</Text>
+        {mode === "live" && person.isMe && <SelfVoiceMatchingConsent patientId={space.id} enabled={person.voiceMatchingConsent} />}
         <Text style={styles.small}>{space.conversations.filter((item) => item.people.includes(person.id)).length} linked conversations</Text>
       </View>) : <Empty title="No people added yet" description="People will appear here when patient-space profiles are available." />}
       <Notice>People profiles do not grant account access or prove who was physically present. In live mode, only selected, consented profiles are checked; uncertain speakers remain unknown.</Notice>
@@ -67,7 +71,7 @@ export function MoreScreen() {
       <Text style={styles.heading}>The microphone stays in your control</Text>
       <Text style={styles.small}>Start while Hale is open and everyone agrees. A microphone indicator stays visible during capture.</Text>
       <Text style={styles.small}>Switch recording on once to keep listening, even with the screen locked. Switch it off here or in the Android notification. Calls, force-stop, or battery policies can interrupt capture; Hale never restarts it automatically.</Text>
-      <Text style={styles.small}>Audio is sent to Sarvam in ten-second segments. Dialogue appears after processing, not word by word. Continuous capture uses battery, mobile data, and your Sarvam API quota. Live speakers remain unknown; voice matching is not run for this mode.</Text>
+      <Text style={styles.small}>Audio is sent to Sarvam in ten-second segments. Dialogue appears after processing, not word by word. If you select eligible people before recording, their consented voice profiles are checked separately by pyannote; other and uncertain voices remain unknown. Continuous capture uses battery, mobile data, and provider quota.</Text>
     </View>
 
     {patients.length > 1 && <View style={styles.card}>
@@ -80,4 +84,22 @@ export function MoreScreen() {
     <Notice>Use fictional names and consented test audio only. Live audio is transcribed and temporary files are deleted after processing. Memory extraction and summaries are still under development.</Notice>
     {mode === "live" && <View style={styles.card}><Text style={styles.heading}>Delete account</Text><Text style={styles.small}>Permanently delete your Hale data and sign-in account. Continue in the browser, sign in to this same account, and review the confirmation. Discard any unsent local recordings separately before deleting.</Text><Button title="Delete account ↗" tone="secondary" disabled={busy} onPress={openAccountDeletion} /></View>}
   </Page>;
+}
+
+function SelfVoiceMatchingConsent({ patientId, enabled }: { patientId: string; enabled: boolean }) {
+  const updateConsent = useMutation(api.setVoiceMatchingConsent);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  function toggle() {
+    setBusy(true);
+    setMessage("");
+    void updateConsent({ patientId, enabled: !enabled })
+      .catch(() => setMessage("Couldn’t update speaker-matching consent. Please try again."))
+      .finally(() => setBusy(false));
+  }
+  return <View style={styles.stack}>
+    <Check checked={enabled} onChange={toggle} disabled={busy}>I consent to my enrolled voice profile being checked by pyannote for speaker labels in this space. I can withdraw consent here; I still need to be selected before any recording is checked.</Check>
+    {busy && <Text style={styles.small}>Updating consent…</Text>}
+    {!!message && <Text accessibilityRole="alert" style={styles.small}>{message}</Text>}
+  </View>;
 }

@@ -22,6 +22,8 @@ export interface Person {
   initials: string;
   enrollment: "not_enrolled" | "enrolled" | "revoked";
   voiceMatchingAvailable: boolean;
+  voiceMatchingConsent: boolean;
+  isMe: boolean;
   color: "green" | "blue" | "sand";
 }
 

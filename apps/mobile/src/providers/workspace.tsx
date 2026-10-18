@@ -26,7 +26,7 @@ export interface Workspace {
   selectPatient(id: string): void;
   signOut(): Promise<void>;
   beginSession(expectedPeople: string[]): Promise<string>;
-  beginContinuousSession(): Promise<string>;
+  beginContinuousSession(expectedPeople: string[]): Promise<string>;
   uploadCredentials(): Promise<{ siteUrl: string; token: string }>;
   endSession(sessionId: string): Promise<void>;
   upload(recording: LocalRecording): Promise<void>;
@@ -69,7 +69,7 @@ function PatientWorkspace({ patientId, patients, selectPatient, children }: { pa
     mode: "live", owner: userId, space, patients, selectPatient, today,
     signOut: async () => { await signOut(); },
     beginSession: (expectedPeople) => begin({ patientId, participantsConsented: true, captureMode: "native", expectedPeople }),
-    beginContinuousSession: () => begin({ patientId, participantsConsented: true, captureMode: "native", continuous: true }),
+    beginContinuousSession: (expectedPeople) => begin({ patientId, participantsConsented: true, captureMode: "native", continuous: true, expectedPeople }),
     uploadCredentials: async () => {
       const token = await getToken({ template: "convex" });
       if (!token) throw new Error("Please sign in again.");

@@ -29,7 +29,7 @@
 - [x] patient-space access checks
 - [x] audio transcription
 - [ ] memory extraction
-- [ ] speaker matching
+- [x] consented, selected-speaker matching for batch and Android live recordings
 - [ ] nightly summaries
 - [x] Expo Android capture implementation
 - [x] native background recording configuration and durable upload queue

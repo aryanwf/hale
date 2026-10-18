@@ -76,6 +76,8 @@ export const api = {
   setFamilyCareAccess: makeFunctionReference<"mutation", { patientId: string; personId: string; enabled: boolean }, null>("families:setCareAccess"),
   linkedPeople: makeFunctionReference<"query", { patientId: string }, { id: string; name: string; linked: boolean; isPatient: boolean; careAccess: boolean }[]>("people:list"),
   unlinkFamily: makeFunctionReference<"mutation", { patientId: string; personId: string }, null>("people:unlinkFamilyMember"),
+  previewPatientInvitation: makeFunctionReference<"query", { token: string }, { patientName: string; personName: string; relationship: string; expiresAt: number } | null>("people:previewInvitation"),
+  acceptPatientInvitation: makeFunctionReference<"mutation", { token: string; useVoiceMatching: boolean }, { patientId: string; alreadyAccepted: true } | { patientId: string; patientName: string; alreadyAccepted: false }>("people:acceptInvitation"),
   voiceProfile: makeFunctionReference<"query", Record<string, never>, { configured: boolean; profile: FamilyProfile | null }>("voices:me"),
   saveFamilyProfile: makeFunctionReference<"mutation", { name: string; relationship: string }, null>("voices:saveProfile"),
   skipVoice: makeFunctionReference<"mutation", Record<string, never>, null>("voices:skip"),

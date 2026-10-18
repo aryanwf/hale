@@ -89,6 +89,7 @@ function LiveGate({ children }: { children: ReactNode }) {
   const accountIsActive = isAuthenticated && accountStatus === "active";
   const patients = useQuery(api.patients, accountIsActive ? { role: "family" } : "skip");
   const [selected, setSelected] = useState<string>();
+  const [previewDemo, setPreviewDemo] = useState(false);
 
   if (!isLoaded) return <Gate title="A moment for your memories…" />;
   if (!isSignedIn) return <Gate title="A little closer, even from afar." description="Sign in to see the memories your loved one shares with your family account."><div className="button-group"><Link href="/login" className="btn btn-primary">Log in <ArrowRight size={17} /></Link><Link href="/signup" className="btn btn-quiet">Create a family account</Link></div></Gate>;
@@ -98,14 +99,24 @@ function LiveGate({ children }: { children: ReactNode }) {
   if (accountStatus === "deleted") return <DeletedAccountGate />;
   if (accountStatus !== "active") return <Gate title="Your memory connection needs attention." description="Please reconnect your sign-in account to continue."><UserButton /></Gate>;
   if (!patients) return <Gate title="Finding your memory space…" />;
-  if (!patients.length) return <Onboarding />;
+  if (previewDemo) return <DemoProvider>{children}</DemoProvider>;
+  if (!patients.length) return <Onboarding onPreviewDemo={() => setPreviewDemo(true)} />;
   const patientId = patients.find((patient) => patient.id === selected)?.id ?? patients[0].id;
   return <LiveSpace key={patientId} patientId={patientId} patients={patients} selectPatient={setSelected}>{children}</LiveSpace>;
 }
 
-function Onboarding() {
+function Onboarding({ onPreviewDemo }: { onPreviewDemo: () => void }) {
   return <Gate title="Welcome to your family dashboard." description="Start by connecting with your loved one. Patient spaces are created in the Android app, not here.">
-    <UserButton /><FamilyConnection embedded /><Link className="btn btn-primary" href="/account/delete">Delete account</Link>
+    <UserButton />
+    <div className="onboarding-demo-preview">
+      <div className="onboarding-demo-copy">
+        <strong>Presenting without the Android app?</strong>
+        <p>Skip setup and explore a fictional dashboard. No live patient data is changed.</p>
+      </div>
+      <button className="btn btn-quiet" type="button" onClick={onPreviewDemo}>Skip connection · Preview demo dashboard</button>
+    </div>
+    <FamilyConnection embedded />
+    <Link className="btn btn-primary" href="/account/delete">Delete account</Link>
   </Gate>;
 }
 

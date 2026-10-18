@@ -394,6 +394,11 @@ svg { flex-shrink: 0; vertical-align: middle; }
 .gate > .eyebrow { margin: 24px 0 22px; }
 .gate h1 { font-family: var(--font-serif); font-size: 36px; font-weight: 400; line-height: 1.22; letter-spacing: -.015em; }
 .gate-description { margin: 20px 0 28px; color: var(--muted); font-size: 14px; line-height: 1.9; }
+.onboarding-demo-preview { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 20px; margin: 20px 0 30px; padding: 17px 19px; border: 1px solid var(--rule); border-radius: 10px; background: #fff; }
+.onboarding-demo-copy { display: grid; flex: 1 1 240px; gap: 5px; }
+.onboarding-demo-copy strong { font-size: 13px; font-weight: 550; }
+.onboarding-demo-copy p { color: var(--muted); font-size: 11px; line-height: 1.65; }
+.onboarding-demo-preview .btn { max-width: 100%; white-space: normal; }
 .onboarding-form { display: grid; gap: 23px; margin-top: 30px; }
 .onboarding-form label:not(.check-label) { display: grid; gap: 9px; font-size: 13px; }
 .onboarding-form input:not([type=checkbox]) { border: 1px solid var(--rule-strong); border-radius: 5px; padding: 12px; width: 100%; }

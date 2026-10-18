@@ -23,15 +23,6 @@ async function listPatients(ctx: QueryCtx, role?: "patient" | "family") {
   }))).filter((item) => item !== null);
 }
 
-async function listPatients(ctx: QueryCtx, role?: "patient" | "family") {
-  const identity = await requireIdentity(ctx);
-  const memberships = await ctx.db.query("memberships").withIndex("by_subject", (q) => q.eq("subject", identity.subject)).take(100);
-  return (await Promise.all(memberships.filter((item) => item.active && (!role || item.role === role)).map(async (membership) => {
-    const patient = await ctx.db.get(membership.patientId);
-    return patient ? { id: patient._id, name: patient.name, timezone: patient.timezone, capabilities: membership.capabilities } : null;
-  }))).filter((item) => item !== null);
-}
-
 export const list = query({
   args: {},
   returns: patientListValidator,
